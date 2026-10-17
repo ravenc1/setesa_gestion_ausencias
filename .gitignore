@@ -1,0 +1,23 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Bytecode de Python
+__pycache__/
+*.py[cod]
+
+# Secretos y credenciales
+.env
+.streamlit/secrets.toml
+
+# Archivos generados en tiempo de ejecución
+storage/pdf/*
+storage/firmas/*
+!storage/pdf/.gitkeep
+!storage/firmas/.gitkeep
+temp_pdf/
+temp_firma_*.png
+
+# Entornos de editor
+.vscode/
+.idea/

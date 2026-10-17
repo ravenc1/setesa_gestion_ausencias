@@ -1,0 +1,8 @@
+streamlit==1.66.0
+streamlit-drawable-canvas==0.13.0
+psycopg2-binary==2.9.13
+pandas==3.0.6
+numpy==2.5.3
+pillow==12.3.0
+fpdf==1.7.2
+python-dotenv==1.2.4
