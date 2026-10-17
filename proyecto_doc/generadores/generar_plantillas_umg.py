@@ -9,10 +9,12 @@ Gestión de Vigencia de Usuarios para la empresa SETESA".
 Salida: proyecto_doc/plantillas_llenadas/Plantillas_UMG_Completadas.docx
 """
 
+import json
 import re
 from pathlib import Path
 from docx import Document
 from docx.shared import Inches, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from docx.oxml.text.paragraph import CT_P
@@ -25,6 +27,8 @@ OUT_DIR = BASE / "proyecto_doc" / "plantillas_llenadas"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 SALIDA = OUT_DIR / "Plantillas_UMG_Completadas.docx"
 DIAGRAMA = OUT_DIR / "diagrama_procesos.png"
+CAPTURAS_DIR = OUT_DIR / "capturas"
+CAPTURAS_MANIFEST = CAPTURAS_DIR / "manifest.json"
 
 ESTUDIANTE = "Ricardo Andree Sebastián Arias Conde"
 CARRERA = "Ingeniería en Sistemas de Información y Ciencias de la Computación"
@@ -111,6 +115,56 @@ def insert_image_after(paragraph, image_path, width_inches=6.2):
     run = new_para.add_run()
     run.add_picture(str(image_path), width=Inches(width_inches))
     return new_para
+
+
+def _nuevo_parrafo_despues(elemento, parent):
+    """Crea un párrafo vacío inmediatamente después de `elemento` (XML)."""
+    p = OxmlElement("w:p")
+    elemento.addnext(p)
+    return Paragraph(p, parent), p
+
+
+def insert_capturas_codigo(despues_de, doc):
+    """Inserta, después de la tabla de Evidencias, las capturas de código por
+    módulo (imágenes con resaltado de sintaxis) con su pie de figura."""
+    if not CAPTURAS_MANIFEST.exists():
+        return
+    manifest = json.loads(CAPTURAS_MANIFEST.read_text(encoding="utf-8"))
+    if not manifest:
+        return
+
+    parent = despues_de._parent
+    elemento = despues_de._tbl
+
+    # Salto de página
+    p, elemento = _nuevo_parrafo_despues(elemento, parent)
+    p.add_run().add_break(WD_BREAK.PAGE)
+
+    # Subtítulo de la subsección
+    p, elemento = _nuevo_parrafo_despues(elemento, parent)
+    r = p.add_run("Evidencias de código fuente por módulos")
+    r.bold = True
+    r.font.size = Pt(12)
+
+    p, elemento = _nuevo_parrafo_despues(elemento, parent)
+    r = p.add_run(
+        "A continuación se presentan fragmentos representativos del código fuente versionado en el "
+        "repositorio GitHub (https://github.com/ravenc1/setesa_gestion_ausencias). Cada captura indica "
+        "el archivo de origen dentro de la estructura del proyecto."
+    )
+    r.font.size = Pt(9.5)
+
+    # Capturas + pies de figura
+    for i, item in enumerate(manifest, start=1):
+        p_img, elemento = _nuevo_parrafo_despues(elemento, parent)
+        p_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_img.add_run().add_picture(str(CAPTURAS_DIR / item["imagen"]), width=Inches(6.1))
+
+        p_cap, elemento = _nuevo_parrafo_despues(elemento, parent)
+        p_cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p_cap.add_run(f"Figura {i}. {item['modulo']} — {item['archivo']}.")
+        r.italic = True
+        r.font.size = Pt(8.5)
 
 
 # ---------------------------------------------------------------------------
@@ -405,6 +459,11 @@ def main() -> None:
     for i, (etiqueta, valor) in enumerate(TABLA_10_EVIDENCIAS):
         set_cell(tablas[9].rows[i].cells[0], etiqueta)
         set_cell(tablas[9].rows[i].cells[1], valor)
+
+    # ------------------------------------------------------------------
+    # 2.1) Insertar las capturas de código por módulos (evidencia, sección 10)
+    # ------------------------------------------------------------------
+    insert_capturas_codigo(tablas[9], doc)
 
     # ------------------------------------------------------------------
     # 3) Insertar el diagrama de procesos generado con Graphviz
