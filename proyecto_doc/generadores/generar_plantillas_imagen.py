@@ -300,6 +300,31 @@ def main() -> None:
         ("Presentación y exposición de resultados", "Pendiente"),
         ("Recolección de información en curso", "En proceso"),
     ], encabezado=["Ítem", "Estado (Pendiente / En proceso / Completado)"])
+    doc.add_page_break()
+
+    # ==================== PLANTILLA 9 ====================
+    titulo_plantilla(doc, 9, "EVIDENCIAS Y DOCUMENTACIÓN TÉCNICA",
+                     "Documenta dónde se resguardan las evidencias y la documentación técnica de la implementación.")
+    tabla(doc, [
+        ("Repositorio de código fuente (GitHub)",
+         "https://github.com/ravenc1/setesa_gestion_ausencias — repositorio público, rama \"main\", commit "
+         "inicial 48d2836 (16/10/2026), correspondiente a la versión 1.0 del sistema SETESA Workflow."),
+        ("Ubicación de evidencias",
+         "Repositorio GitHub del proyecto y carpeta storage/ (subcarpetas pdf y firmas). El código se organiza "
+         "en app.py (punto de entrada), src/core (autenticación, catálogos, workflow, base de datos), "
+         "src/features (registro, coordinador, vigencia, dashboard) y src/services (motor PDF y firmas)."),
+        ("Convención de nombres",
+         "Casos de prueba: PR-0X_caso-prueba_fecha; expedientes PDF: accion_<usuario>_<id>d.pdf."),
+        ("Documentación técnica",
+         "docs/ESTRUCTURA.md (arquitectura y estructura de carpetas), requirements.txt (dependencias), "
+         "tests/smoke_test.py (pruebas de humo), .env.example (variables de entorno), scripts/hash_passwords.py "
+         "y el informe del proyecto de graduación (PG2_Proyecto_Pagina_Web_SETESA_RicardoArias.pdf)."),
+        ("Responsable de custodia",
+         "Ricardo Andree Sebastián Arias Conde (Investigador) / Administrador de TI de SETESA."),
+        ("Restricciones de acceso",
+         "Acceso restringido por RBAC; los datos sensibles solo los visualiza Gerencia. El repositorio es "
+         "público y no contiene credenciales: el archivo .env está excluido mediante .gitignore."),
+    ], encabezado=["Elemento", "Detalle"])
 
     doc.save(str(SALIDA))
     print("Documento generado:", SALIDA)

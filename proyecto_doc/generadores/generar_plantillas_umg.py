@@ -292,10 +292,17 @@ TABLA_9_RIESGOS = [
 ]
 
 TABLA_10_EVIDENCIAS = [
-    ("Ubicación de evidencias", "Repositorio GitHub del proyecto y carpeta storage/ (subcarpetas pdf y firmas)"),
-    ("Convención de nombres", "PR-0X_caso-prueba_fecha y accion_<usuario>_<id>d.pdf"),
+    ("Ubicación de evidencias",
+     "Repositorio de código fuente en GitHub: https://github.com/ravenc1/setesa_gestion_ausencias "
+     "(repositorio público, rama \"main\", commit inicial 48d2836, del 16/10/2026); carpeta "
+     "storage/ del proyecto (subcarpetas pdf y firmas)."),
+    ("Convención de nombres",
+     "Casos de prueba: PR-0X_caso-prueba_fecha; expedientes PDF: accion_<usuario>_<id>d.pdf. "
+     "El control de versiones se registra en GitHub mediante commits y etiquetas (tags)."),
     ("Responsable de custodia", "Ricardo A. S. Arias Conde (Investigador) / Administrador de TI de SETESA"),
-    ("Restricciones de acceso", "Acceso restringido por RBAC; los datos sensibles solo los visualiza Gerencia"),
+    ("Restricciones de acceso",
+     "Acceso restringido por RBAC; los datos sensibles solo los visualiza Gerencia. El repositorio "
+     "GitHub es público y no contiene credenciales (el archivo .env está excluido mediante .gitignore)."),
 ]
 
 TEXTOS_ANALISIS = {
