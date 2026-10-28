@@ -35,7 +35,11 @@ CREATE TABLE IF NOT EXISTS usuario (
     correo_institucional VARCHAR(150) NOT NULL UNIQUE,
     password_hash        VARCHAR(255) NOT NULL,
     estado_vigencia      BOOLEAN DEFAULT TRUE,
-    ultima_actividad     TIMESTAMP NOT NULL
+    ultima_actividad     TIMESTAMP NOT NULL,
+    dias_vacaciones_asignados INTEGER NOT NULL DEFAULT 15,
+    CONSTRAINT usuario_dias_vacaciones_check CHECK (
+        dias_vacaciones_asignados >= 0
+    )
 );
 
 -- ---------------------------------------------------------------------------
@@ -109,6 +113,16 @@ CREATE TABLE IF NOT EXISTS vigencia_log (
 );
 
 -- ---------------------------------------------------------------------------
+-- Catálogo de feriados nacionales (RF-01 / D-04)
+--   Se excluyen del cálculo de días hábiles de las solicitudes.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS feriado (
+    id_feriado SERIAL PRIMARY KEY,
+    fecha      DATE NOT NULL UNIQUE,
+    nombre     VARCHAR(120) NOT NULL
+);
+
+-- ---------------------------------------------------------------------------
 -- Índices de consulta
 -- ---------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS idx_solicitud_estado_fecha
@@ -120,6 +134,9 @@ CREATE INDEX IF NOT EXISTS idx_historial_solicitud
 CREATE INDEX IF NOT EXISTS idx_vigencia_log_fecha
     ON vigencia_log (fecha_ejecucion DESC);
 
+CREATE INDEX IF NOT EXISTS idx_feriado_fecha
+    ON feriado (fecha);
+
 -- ---------------------------------------------------------------------------
 -- Datos base: roles del sistema
 -- ---------------------------------------------------------------------------
@@ -128,5 +145,40 @@ INSERT INTO rol (nombre_rol, descripcion_rol) VALUES
     ('Administrador', 'Gerencia: autoriza solicitudes, consulta métricas y ejecuta la vigencia.'),
     ('Coordinador GTC', 'Jefe inmediato del banco: otorga el visto bueno de las solicitudes.')
 ON CONFLICT (nombre_rol) DO NOTHING;
+
+-- Feriados nacionales de Guatemala (días completos). Semana Santa: jueves,
+-- viernes y sábado santo. Ampliar por año desde el panel de Gerencia.
+INSERT INTO feriado (fecha, nombre) VALUES
+    ('2025-01-01', 'Año Nuevo'),
+    ('2025-04-17', 'Jueves Santo'),
+    ('2025-04-18', 'Viernes Santo'),
+    ('2025-04-19', 'Sábado Santo'),
+    ('2025-05-01', 'Día del Trabajo'),
+    ('2025-06-30', 'Día del Ejército'),
+    ('2025-09-15', 'Independencia'),
+    ('2025-10-20', 'Revolución'),
+    ('2025-11-01', 'Todos los Santos'),
+    ('2025-12-25', 'Navidad'),
+    ('2026-01-01', 'Año Nuevo'),
+    ('2026-04-02', 'Jueves Santo'),
+    ('2026-04-03', 'Viernes Santo'),
+    ('2026-04-04', 'Sábado Santo'),
+    ('2026-05-01', 'Día del Trabajo'),
+    ('2026-06-30', 'Día del Ejército'),
+    ('2026-09-15', 'Independencia'),
+    ('2026-10-20', 'Revolución'),
+    ('2026-11-01', 'Todos los Santos'),
+    ('2026-12-25', 'Navidad'),
+    ('2027-01-01', 'Año Nuevo'),
+    ('2027-03-25', 'Jueves Santo'),
+    ('2027-03-26', 'Viernes Santo'),
+    ('2027-03-27', 'Sábado Santo'),
+    ('2027-05-01', 'Día del Trabajo'),
+    ('2027-06-30', 'Día del Ejército'),
+    ('2027-09-15', 'Independencia'),
+    ('2027-10-20', 'Revolución'),
+    ('2027-11-01', 'Todos los Santos'),
+    ('2027-12-25', 'Navidad')
+ON CONFLICT (fecha) DO NOTHING;
 
 COMMIT;

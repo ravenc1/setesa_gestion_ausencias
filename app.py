@@ -3,7 +3,7 @@
 # Importación de módulos lógicos 
 import streamlit as st
 from src.core import auth
-from src.features import registro, dashboard, vigencia, coordinador
+from src.features import registro, dashboard, vigencia, coordinador, feriados
 
 st.set_page_config(page_title="SETESA Workflow", page_icon="🏢", layout="wide")
 
@@ -46,8 +46,16 @@ else:
         
     elif st.session_state['rol'] == 'Administrador':
         st.title("Panel Gerencial - SETESA")
-        tab1, tab2 = st.tabs(["📊 Dashboard de Solicitudes", "🛡️ Control de Vigencia"])
+        tab1, tab2, tab3 = st.tabs(
+            [
+                "📊 Dashboard de Solicitudes",
+                "🛡️ Control de Vigencia",
+                "🗓️ Feriados",
+            ]
+        )
         with tab1:
             dashboard.mostrar_dashboard()
         with tab2:
             vigencia.mostrar_panel_vigencia()
+        with tab3:
+            feriados.mostrar_panel_feriados()

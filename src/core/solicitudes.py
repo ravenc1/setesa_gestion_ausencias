@@ -8,6 +8,13 @@
 import pandas as pd
 
 from src.core.database import get_connection
+from src.core.feriados import fechas_feriados
+from src.core.utils import calcular_dias_habiles
+from src.core.validaciones import (
+    ValidacionError,
+    validar_fechas,
+    validar_saldo_vacaciones,
+)
 from src.core.vigencia import marcar_actividad
 from src.core.workflow import (
     ESTADO_FINALIZADA,
@@ -88,6 +95,26 @@ def registrar_solicitud(
 
     Devuelve el id_solicitud generado. Lanza excepción si falla la transacción.
     """
+    validar_fechas(fecha_inicio, fecha_fin)
+
+    # H-17: los días se recalculan en el servidor descontando feriados.
+    feriados = fechas_feriados(fecha_inicio, fecha_fin)
+    dias_calculados = calcular_dias_habiles(fecha_inicio, fecha_fin, feriados)
+    if dias_calculados <= 0:
+        raise ValidacionError("El rango seleccionado no contiene días hábiles.")
+    if dias_solicitados is None or dias_solicitados <= 0:
+        dias_solicitados = dias_calculados
+    elif int(dias_solicitados) != dias_calculados:
+        raise ValidacionError(
+            f"Los días solicitados ({dias_solicitados}) no coinciden con los "
+            f"días hábiles del rango ({dias_calculados})."
+        )
+
+    # RF-01: no se puede solicitar más vacaciones de las disponibles.
+    validar_saldo_vacaciones(
+        id_usuario, tipo_ausencia, dias_calculados, fecha_inicio
+    )
+
     conn = get_connection()
     if not conn:
         raise RuntimeError("No hay conexión a la base de datos.")

@@ -4,7 +4,7 @@ Organización por capas (Arquitectura Web de Tres Capas, según el documento del
 proyecto). Los módulos están en sus paquetes, con `import` absolutos,
 credenciales externalizadas y utilidades de prueba.
 
-Estado actual: **Fases 0, 1, 2, 3 y 4 completadas** (ver `docs/CHECKLIST_AVANCE.md`).
+Estado actual: **Fases 0, 1, 2, 3, 4 y 5 completadas** (ver `docs/CHECKLIST_AVANCE.md`).
 
 ## Árbol
 
@@ -29,12 +29,17 @@ proyecto_setesa/
 │   │   ├── vigencia.py        # Baja lógica, auditoría y reactivación
 │   │   ├── catalogos.py       # Catálogo de tipos de ausencia
 │   │   ├── reportes.py        # Filtros, KPIs y exportación CSV (RF-04)
+│   │   ├── feriados.py        # Catálogo de feriados (RF-01 / D-04)
+│   │   ├── vacaciones.py      # Saldo asignado − usado (RF-01 / D-03)
+│   │   ├── validaciones.py    # Reglas de fechas y saldo en servidor
+│   │   ├── usuarios.py        # Usuarios por rol (jefe GTC)
 │   │   ├── utils.py           # Lógica pura (calcular_dias_habiles)
 │   │   └── config.py          # Rutas centralizadas (storage/)
 │   ├── features/              # Módulos funcionales por rol
 │   │   ├── registro.py        # Formulario del Consultor (CU-02)
 │   │   ├── coordinador.py     # Panel Coordinador GTC (CU-04)
 │   │   ├── dashboard.py       # Panel gerencial + filtros + descargas (CU-05)
+│   │   ├── feriados.py        # Administración de feriados (Gerencia)
 │   │   └── vigencia.py        # Baja lógica semestral (CU-06)
 │   └── services/              # Servicios de soporte
 │       ├── documentos.py      # PDF oficial desde la BD + ruta_pdf + descarga
@@ -45,6 +50,7 @@ proyecto_setesa/
 │   ├── backup_datos.py        # Respaldo lógico JSON
 │   ├── migracion_fase1.py     # Historial + normalización de estados
 │   ├── migracion_fase3.py     # vigencia_log + restricciones
+│   ├── migracion_fase5.py     # saldo de vacaciones + catálogo de feriados
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a hash
 │
@@ -59,6 +65,9 @@ proyecto_setesa/
 │   ├── test_vigencia.py       # Baja lógica, auditoría y reactivación (BD real)
 │   ├── test_reportes.py       # Filtros, KPIs y CSV del dashboard (unitarias)
 │   ├── test_dashboard_integration.py  # Repositorio + PDF final (BD real)
+│   ├── test_feriados.py       # Catálogo de feriados (BD real)
+│   ├── test_vacaciones.py     # Saldo asignado − usado (BD real)
+│   ├── test_validaciones.py   # Reglas de fechas y saldo
 │   ├── test_app_smoke.py      # Renderizado con AppTest + login inactivo
 │   └── smoke_test.py          # Prueba E2E manual (rollback/limpieza)
 │
@@ -148,7 +157,7 @@ tesis (que exige `Pendiente de Firma Coordinador`).
    `auth.py` valida con `security.verify_or_upgrade` y auto-migra al iniciar sesión.
    Se agregó RBAC por módulo (`rol_autorizado`).
 4. **Fase 0 (línea base)**: `docs/schema.sql`, `README.md`, `pytest.ini`,
-   34 pruebas automatizadas iniciales y respaldo JSON (hoy 64).
+   34 pruebas automatizadas iniciales y respaldo JSON (hoy 83).
 5. **Fase 1 (coherencia del workflow)**:
    - `src/core/solicitudes.py` centraliza registro y cambios de estado.
    - `solicitud_historial` audita cada transición.
@@ -189,6 +198,18 @@ tesis (que exige `Pendiente de Firma Coordinador`).
    - `services/documentos.py::preparar_pdf_descarga` reutiliza `solicitud.ruta_pdf`
      o regenera el PDF si el archivo no existe.
    - Exportación CSV compatible con Excel (no requiere `openpyxl`).
+9. **Fase 5 (saldo de vacaciones y feriados)**:
+   - `usuario.dias_vacaciones_asignados` (15 por defecto, `CHECK >= 0`).
+   - `src/core/vacaciones.py` calcula asignados − usados del año; el panel del
+     consultor muestra los tres valores (RF-01).
+   - `src/core/feriados.py` + tabla `feriado` (fecha única); Gerencia administra
+     el catálogo desde la pestaña **Feriados**.
+   - `calcular_dias_habiles` excluye feriados; el registro recalcula los días en
+     el servidor y rechaza discrepancias.
+   - `src/core/validaciones.py` valida fechas y saldo antes de insertar; el
+     formulario replica los mensajes.
+   - El jefe GTC se elige desde los usuarios vigentes con rol Coordinador GTC.
+   - `scripts/migracion_fase5.py` es idempotente y siembra 2025–2027.
 
 ## Módulo Consultor
 
@@ -199,11 +220,10 @@ tesis (que exige `Pendiente de Firma Coordinador`).
 
 ## Pendientes conocidos
 
-- **Fase 5 (P1)**: saldo de días de vacaciones (RF-01), validación de fechas,
-  feriados de Guatemala y jefe GTC desde usuarios.
 - **Fase 6 (P1/P2)**: cifrado de datos sensibles, sello SHA-256 del PDF,
-  SQLAlchemy (elimina la advertencia de pandas) y logging.
+  SQLAlchemy (elimina la advertencia de pandas), logging y CI.
 - **D-02**: rol Contabilidad de solo lectura (diferido; la tesis usa
   Administrador como beneficiario del dashboard).
+- **R-11**: recordatorio al banco (diferido; sin correo institucional).
 - Advertencia de pandas: `pd.read_sql_query` con conexión DBAPI2 (se resuelve
   en la Fase 6 con SQLAlchemy).

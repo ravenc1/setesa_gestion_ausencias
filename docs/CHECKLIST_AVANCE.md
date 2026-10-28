@@ -14,12 +14,13 @@
 
 El proyecto tiene una **base sólida y funcional**: los 7 módulos existen, el
 flujo Consultor → Coordinador → Gerencia → PDF se ejecuta de extremo a extremo y
-la prueba E2E actual pasa **43/43**. La arquitectura de tres capas está
+la prueba E2E actual pasa **52/52**. La arquitectura de tres capas está
 respetada, la seguridad de contraseñas (PBKDF2) está resuelta y, tras las fases
-0–4, el workflow es trazable, las **tres firmas** se capturan y se estampan, la
-**vigencia semestral** es automática, auditable y reversible, y el **dashboard**
+0–5, el workflow es trazable, las **tres firmas** se capturan y se estampan, la
+**vigencia semestral** es automática, auditable y reversible, el **dashboard**
 permite filtrar por nombre, fecha y tipo, ver KPIs, descargar el PDF final y
-exportar los resultados.
+exportar los resultados, y el consultor ve su **saldo de vacaciones** con
+**feriados** descontados y validaciones de servidor.
 
 La inspección inicial encontró brechas de coherencia entre lo que la tesis
 declara y lo que el sistema realmente hace. **Todos los defectos P0 están
@@ -32,11 +33,11 @@ cerrados:**
 3. ~~Las firmas de Coordinador y Gerencia no se capturaban~~ **Resuelto Fase 2**
    (PR-06 cerrado).
 
-Quedan brechas **P1/P2** ya planificadas: saldo de vacaciones, feriados,
-cifrado en reposo y sello de integridad del PDF.
+Quedan brechas **P1/P2** ya planificadas: cifrado en reposo, sello de integridad
+del PDF, logging y CI.
 
-**Conclusión:** el sistema está ~95 % funcional y ~92 % de cumplimiento
-verificable contra la tesis. Con las fases 5 y 6 (aprox. 2.5 días de trabajo) se
+**Conclusión:** el sistema está ~98 % funcional y ~96 % de cumplimiento
+verificable contra la tesis. Con la fase 6 (aprox. 1.5 días de trabajo) se
 puede cerrar al 100 % con evidencia de QA.
 
 ### Registro de avance
@@ -48,17 +49,20 @@ puede cerrar al 100 % con evidencia de QA.
 | 27/10/2026 | **Fase 2** | Canvas y firma obligatoria de Coordinador y Gerencia, PDF con 3 firmas, `ruta_pdf`, nombres únicos y limpieza de temporales. **PR-06 cerrado.** |
 | 27/10/2026 | **Fase 3** | `ultima_actividad` en login/acciones, `vigencia_log`, protección de Administrador, ejecución automática semestral, reactivación e invalidación de sesiones. **H-01/H-06 cerrados; QA-01/QA-06/PR-05 completos.** |
 | 27/10/2026 | **Fase 4** | Filtros por nombre, estado, tipo y rango de fechas; KPIs completos; alertas; paginación; descarga del PDF final y exportación CSV. **H-08/H-09, D-10/D-11/D-13 cerrados.** |
+| 27/10/2026 | **Fase 5** | Saldo de vacaciones (asignado − usado), catálogo de feriados administrable, validación de fechas y saldo en servidor, jefe GTC desde usuarios. **H-07/H-16/H-17/H-18 y D-03/D-04 cerrados.** |
 
 **Evidencias:** `docs/evidencias/2026-10-27_fase0-1.md`,
 `docs/evidencias/2026-10-27_fase2.md`,
-`docs/evidencias/2026-10-27_fase3.md` y
-`docs/evidencias/2026-10-27_fase4.md`.
-**Pruebas al cierre:** `pytest` 64/64 y smoke test 43/43, sin datos de prueba
+`docs/evidencias/2026-10-27_fase3.md`,
+`docs/evidencias/2026-10-27_fase4.md` y
+`docs/evidencias/2026-10-27_fase5.md`.
+**Pruebas al cierre:** `pytest` 83/83 y smoke test 52/52, sin datos de prueba
 residuales en la base.
 
-**Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-08, H-09, H-10,
-H-12, H-14, H-15 y D-01.
-**Hallazgos que siguen abiertos:** H-07, H-11 y H-13 (Fases 5–6).
+**Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-07, H-08, H-09,
+H-10, H-12, H-14, H-15, H-16, H-17, H-18, H-22 y D-01, D-03, D-04.
+**Hallazgos que siguen abiertos:** H-11, H-13, H-19, H-20, H-21, H-23 (Fase 6) y
+R-11 (recordatorio al banco, diferido).
 
 ---
 
@@ -140,12 +144,12 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | N-02 | Rutas centralizadas (`storage/`) | ✅ | `src/core/config.py` | — |
 | N-03 | Catálogo de estados | ✅ | `workflow.py` + `CHECK` en BD; los 4 estados están en uso | — |
 | N-04 | Catálogo de tipos de ausencia | ✅ | `catalogos.py` (22 opciones, alineadas al formato) | — |
-| N-05 | Cálculo de días hábiles | 🟡 | `utils.py` cuenta lun–vie; **no excluye feriados** | H-26 |
+| N-05 | Cálculo de días hábiles | ✅ | `utils.py` cuenta lun–vie y excluye feriados del catálogo | — |
 | N-06 | Hashing PBKDF2 + migración | ✅ | `security.py`, `scripts/hash_passwords.py` | — |
 | N-07 | RBAC por módulo | ✅ | `rol_autorizado()` + revalidación de vigencia en cada rerun (`app.py`) | — |
 | N-08 | **Esquema SQL versionado** | ✅ | `docs/schema.sql` validado en esquema temporal | — |
 | N-09 | README de instalación/ejecución | ✅ | `README.md` | — |
-| N-10 | Pruebas automatizadas (pytest) | ✅ | 64 pruebas (unitarias, integración, PDF, vigencia, reportes y AppTest) | — |
+| N-10 | Pruebas automatizadas (pytest) | ✅ | 83 pruebas (unitarias, integración, PDF, vigencia, reportes, feriados, vacaciones y AppTest) | — |
 | N-11 | Advertencia `pd.read_sql_query` | 🔧 | Pandas exige SQLAlchemy | H-31 |
 | N-12 | Limpieza de firmas temporales | ✅ | `utils_firma.eliminar_archivo` + `finally` en el motor; verificado por `test_documentos` | — |
 | N-13 | Logging de errores | 🔴 | Se usa `st.error()` dentro de la capa de datos | H-32 |
@@ -168,18 +172,18 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | # | Ítem | Estado | Detalle |
 |---|---|---|---|
 | R-01 | Formulario de Acción de Personal | ✅ | Jefe, puesto, código, fechas, naturaleza, explicación |
-| R-02 | Cálculo de días hábiles en vivo | ✅ | `st.metric` + validación de rango |
+| R-02 | Cálculo de días hábiles en vivo | ✅ | `st.metric` + validación de rango; descuenta feriados del catálogo |
 | R-03 | Canvas de firma del consultor | ✅ | `streamlit-drawable-canvas`, Base64, recorte y fondo blanco |
 | R-04 | Inserción transaccional | ✅ | `commit` correcto; el PDF se genera desde la BD y persiste `ruta_pdf` |
 | R-05 | Generación y descarga del PDF | ✅ | Se genera al firmar y se descarga |
 | R-06 | Historial personal + PDF actualizado | ✅ | Consulta filtrada por `id_usuario` (RBAC de datos) |
-| R-07 | **Saldo de días de vacaciones** | 🔴 | **RF-01** lo exige; no existe campo ni cálculo |
+| R-07 | **Saldo de días de vacaciones** | ✅ | **RF-01**: asignados − usados en el panel; validación de saldo en el servidor |
 | R-08 | Estado inicial según tesis | ✅ | Opción C: `Ingresada` → `Pendiente de Firma Coordinador` en la misma transacción | — |
-| R-09 | Validar `fecha_fin >= fecha_inicio` | 🔧 | Si el usuario mueve el inicio, el fin no se reajusta; mensaje engañoso |
+| R-09 | Validar `fecha_fin >= fecha_inicio` | ✅ | Validación en UI y en `validaciones.validar_fechas` (servidor) |
 | R-10 | Guardar `ruta_pdf` | ✅ | `services/documentos.py` actualiza la columna tras cada generación |
 | R-11 | Alertas/recordatorios al banco | 🔴 | Diseño (Tabla 9) lo menciona; no implementado |
-| R-12 | Seleccionar jefe GTC desde usuarios | 🔧 | Hoy es texto libre; puede asignarse a cualquiera |
-| R-13 | Feriados de Guatemala | 🔧 | Solo fines de semana |
+| R-12 | Seleccionar jefe GTC desde usuarios | ✅ | `selectbox` con los usuarios vigentes del rol Coordinador GTC |
+| R-13 | Feriados de Guatemala | ✅ | Catálogo `feriado` administrable desde Gerencia |
 
 ### 4.4 Módulo `motor_pdf.py` (RF-03 / RF-06 / QA-05)
 
@@ -254,6 +258,20 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | F-05 | Validación de tamaño/formato | 🔧 | No limita peso ni valida PNG |
 | F-06 | Limpieza posterior | ✅ | `eliminar_archivo` tras generar el PDF |
 
+### 4.9 Servicios de negocio de la Fase 5 (RF-01 / H-16 / H-17 / H-18)
+
+| # | Ítem | Estado | Detalle |
+|---|---|---|---|
+| B-01 | Catálogo de feriados | ✅ | `src/core/feriados.py` + tabla `feriado` (fecha única) |
+| B-02 | Semilla de feriados | ✅ | 2025–2027, incluida la Semana Santa |
+| B-03 | Administración de feriados | ✅ | Pestaña **Feriados** del panel de Gerencia (alta/baja) |
+| B-04 | Saldo de vacaciones | ✅ | `src/core/vacaciones.py` (asignados − usados del año) |
+| B-05 | Días asignados por usuario | ✅ | `usuario.dias_vacaciones_asignados` (15 por defecto, `CHECK >= 0`) |
+| B-06 | Validación de saldo en servidor | ✅ | `validaciones.validar_saldo_vacaciones` dentro de `registrar_solicitud` |
+| B-07 | Validación de fechas en servidor | ✅ | `validaciones.validar_fechas` |
+| B-08 | Jefe GTC desde usuarios | ✅ | `usuarios.listar_coordinadores` + `selectbox` |
+| B-09 | Recálculo de días con feriados | ✅ | El servicio recalcula y rechaza discrepancias con la UI |
+
 ---
 
 ## 5. Checklist de pruebas y evidencias
@@ -273,12 +291,14 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | PR-05 | Baja lógica | Completado | ✅ `vigencia_log`, salvaguarda, reactivación y expulsión de sesión | — |
 | PR-06 | Firma incrustada | En proceso | ✅ Completado: 3 firmas capturadas, persistidas y estampadas | — |
 
-**Cobertura automatizada actual:** 64 pruebas pytest + 43 checks del smoke test.
-Cubren: días hábiles, seguridad, transiciones válidas/inválidas, historial,
-firma obligatoria y persistida, PDF con 3 imágenes, `ruta_pdf`, limpieza de
-temporales, integración contra BD real, render de los 3 paneles, login inactivo
-(QA-01), vigencia con fechas controladas (QA-06), filtros combinados del
-dashboard, KPIs, exportación CSV y descarga del PDF final (RF-04 / HU-03).
+**Cobertura automatizada actual:** 83 pruebas pytest + 52 checks del smoke test.
+Cubren: días hábiles con feriados, seguridad, transiciones válidas/inválidas,
+historial, firma obligatoria y persistida, PDF con 3 imágenes, `ruta_pdf`,
+limpieza de temporales, integración contra BD real, render de los 3 paneles,
+login inactivo (QA-01), vigencia con fechas controladas (QA-06), filtros
+combinados del dashboard, KPIs, exportación CSV, descarga del PDF final
+(RF-04 / HU-03), saldo de vacaciones (RF-01), catálogo de feriados y validaciones
+de fechas/saldo.
 **Faltan:** RBAC negativo entre roles, cifrado y sello del PDF.
 
 ---
@@ -300,7 +320,7 @@ dashboard, KPIs, exportación CSV y descarga del PDF final (RF-04 / HU-03).
 
 | ID | Hallazgo | Detalle | Requerimiento |
 |---|---|---|---|
-| H-07 | Falta saldo de días de vacaciones | Días asignados – usados = disponibles | RF-01 |
+| ~~H-07~~ ✅ | ~~Falta saldo de días de vacaciones~~ **Resuelto Fase 5** | `vacaciones.py` + `usuario.dias_vacaciones_asignados` y validación de saldo | RF-01 |
 | ~~H-08~~ ✅ | ~~Faltan filtros por fecha y tipo en el dashboard~~ **Resuelto Fase 4** | `filtrar_solicitudes` con solapamiento de fechas y selector de tipo | RF-04 |
 | ~~H-09~~ ✅ | ~~Falta descarga del PDF final desde el dashboard~~ **Resuelto Fase 4** | `preparar_pdf_descarga` + botón en el panel gerencial | HU-03 |
 | ~~H-10~~ ✅ | ~~`ruta_pdf` nunca se guarda~~ **Resuelto Fase 2** | `services/documentos.py` persiste la ruta | RF-03 / trazabilidad |
@@ -314,9 +334,9 @@ dashboard, KPIs, exportación CSV y descarga del PDF final (RF-04 / HU-03).
 |---|---|
 | ~~H-14~~ ✅ | ~~Nombres de PDF y de firmas temporales colisionan~~ **Resuelto Fase 2** |
 | ~~H-15~~ ✅ | ~~Sin limpieza de archivos temporales~~ **Resuelto Fase 2** |
-| H-16 | Validación de fechas y mensajes de error |
-| H-17 | Feriados de Guatemala no considerados |
-| H-18 | Jefe GTC como texto libre |
+| ~~H-16~~ ✅ | ~~Validación de fechas y mensajes de error~~ **Resuelto Fase 5**: validación en UI y servidor |
+| ~~H-17~~ ✅ | ~~Feriados de Guatemala no considerados~~ **Resuelto Fase 5**: catálogo `feriado` administrable |
+| ~~H-18~~ ✅ | ~~Jefe GTC como texto libre~~ **Resuelto Fase 5**: se elige entre los usuarios Coordinador GTC |
 | H-19 | 🟡 Suite unitaria + integración + AppTest lista; falta CI |
 | H-20 | 🟡 README listo; falta guía de despliegue |
 | H-21 | Advertencia de pandas / SQLAlchemy |
@@ -331,8 +351,8 @@ dashboard, KPIs, exportación CSV y descarga del PDF final (RF-04 / HU-03).
 |---|---|---|---|
 | **D-01** | Estado al registrar una solicitud | (A) `Ingresada` y el coordinador firma desde ahí · (B) `Pendiente de Firma Coordinador` desde el inicio · (C) registrar `Ingresada` y transicionar en la misma transacción, dejando historial de ambos | **C**: cumple HU-01/QA-03 y el paso 3 de 4.12.3, y hace que los 4 estados existan de verdad |
 | **D-02** | Rol “Contabilidad” | (A) Crear rol de solo lectura · (B) mantener solo Administrador | **A** si la defensa exige HU-03; **B** si se prioriza tiempo |
-| **D-03** | Origen del saldo de vacaciones | (A) campo `dias_vacaciones_asignados` en `usuario` · (B) cálculo por año a partir de solicitudes · (C) ambos | **C** (asignado – usado = disponible) |
-| **D-04** | Feriados | (A) tabla `feriado` administrable · (B) lista fija en código | **A** (más auditable) |
+| **D-03** | Origen del saldo de vacaciones | (A) campo `dias_vacaciones_asignados` en `usuario` · (B) cálculo por año a partir de solicitudes · (C) ambos | **C confirmada**: asignado − usado = disponible (Fase 5) |
+| **D-04** | Feriados | (A) tabla `feriado` administrable · (B) lista fija en código | **A confirmada**: tabla `feriado` con panel de Gerencia (Fase 5) |
 | **D-05** | Cifrado de datos sensibles | (A) Fernet en la app · (B) `pgcrypto` en PostgreSQL | **A** (clave en `.env`, sin exponerla a la BD) |
 | **D-06** | Rechazo/devolución | (A) agregar estado `Devuelta` con motivo · (B) fuera de alcance | **B** para no ampliar el alcance de la tesis; documentarlo como límite |
 
@@ -422,15 +442,16 @@ PDF; rol Contabilidad diferido por D-02).
 
 ### Fase 5 — RF-01 y validaciones de negocio (1 día) · P1
 
-- [ ] **H-07/D-03** Saldo de vacaciones: días asignados, usados y disponibles en el panel del consultor.
-- [ ] **H-16** Validar `fecha_fin >= fecha_inicio` en servidor y corregir mensajes.
-- [ ] **H-17/D-04** Descontar feriados de Guatemala.
-- [ ] **H-18** Seleccionar al jefe GTC desde los usuarios con rol Coordinador.
-- [ ] **R-11** Recordatorio al banco (registro de alerta o enlace `mailto`).
-- [ ] Pruebas: saldo correcto tras varias solicitudes; fechas inválidas rechazadas; feriado descontado.
+- [x] **H-07/D-03** Saldo de vacaciones: días asignados, usados y disponibles en el panel del consultor.
+- [x] **H-16** Validar `fecha_fin >= fecha_inicio` en servidor y corregir mensajes.
+- [x] **H-17/D-04** Descontar feriados de Guatemala (catálogo administrable).
+- [x] **H-18** Seleccionar al jefe GTC desde los usuarios con rol Coordinador.
+- [ ] **R-11** Recordatorio al banco (registro de alerta o enlace `mailto`). Diferido.
+- [x] Pruebas: saldo correcto tras varias solicitudes; fechas inválidas rechazadas; feriado descontado.
 
 **Criterio de aceptación:** RF-01 se cumple de punta a punta y las validaciones
-no permiten datos imposibles.
+no permiten datos imposibles. ✅ **Cumplido** (83 pruebas, 52 checks y
+`test_vacaciones`/`test_feriados` con datos temporales; R-11 diferido).
 
 ### Fase 6 — RNF, cierre y documentación (1.5 días) · P1/P2
 
@@ -477,36 +498,33 @@ Una tarea se considera cerrada solo si:
 | Área | Cumplimiento estimado | Estado |
 |---|---|---|
 | Autenticación / RBAC | 95 % | 🟢 |
-| Registro de solicitudes | 90 % | 🟢 |
+| Registro de solicitudes | 98 % | 🟢 |
 | Motor PDF | 90 % | 🟢 |
 | Workflow / trazabilidad | 90 % | 🟢 |
 | Firmas (3 roles) | 95 % | 🟢 |
 | Dashboard / métricas | 95 % | 🟢 |
 | Vigencia | 95 % | 🟢 |
+| Vacaciones / feriados | 100 % | 🟢 |
 | Seguridad RNF | 55 % | 🟡 |
-| Pruebas / evidencias | 95 % | 🟢 |
-| Documentación técnica | 90 % | 🟢 |
-| **Total ponderado** | **~92 %** | 🟢 |
+| Pruebas / evidencias | 97 % | 🟢 |
+| Documentación técnica | 92 % | 🟢 |
+| **Total ponderado** | **~96 %** | 🟢 |
 
 ---
 
 ## 12. Próximo paso recomendado
 
-Continuar con la **Fase 5 — RF-01 y validaciones de negocio**:
+Continuar con la **Fase 6 — RNF, cierre y documentación**:
 
-1. Saldo de vacaciones (días asignados, usados y disponibles) en el panel del
-   consultor (**H-07**, decisión D-03).
-2. Validar `fecha_fin >= fecha_inicio` en el servidor y unificar mensajes
-   (**H-16**).
-3. Descontar feriados de Guatemala del cálculo de días hábiles (**H-17**,
-   decisión D-04).
-4. Seleccionar al jefe GTC desde los usuarios con rol Coordinador (**H-18**).
-5. Pruebas: saldo correcto tras varias solicitudes, fechas inválidas rechazadas
-   y feriado descontado.
+1. Cifrado en reposo de `explicacion` y firmas (**H-11**, decisión D-05).
+2. Sello SHA-256 del PDF y registro para verificar integridad (**H-13**).
+3. Migrar a SQLAlchemy para eliminar la advertencia de pandas (**H-21**).
+4. Logging centralizado (**H-23**) y CI (**H-19**).
+5. Regresión completa QA-01…QA-06 y PR-01…PR-06, y actualización de las tablas
+   25, 26 y 27 de la tesis.
 
-Con las Fases 0–4 cerradas, la Fase 5 completa RF-01 y elimina los datos
-imposibles; la Fase 6 cierra los RNF (cifrado y sello del PDF) y la regresión
-final para la defensa.
+Con las Fases 0–5 cerradas, la Fase 6 cierra los RNF y deja el proyecto listo
+para la defensa con evidencia de QA.
 
 ---
 

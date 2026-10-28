@@ -31,6 +31,15 @@ from src.core.workflow import (
 from src.core.security import hash_password
 from src.core.utils import calcular_dias_habiles
 from src.core.reportes import exportar_csv, filtrar_solicitudes
+from src.core.feriados import (
+    crear_feriado,
+    eliminar_feriado,
+    fechas_feriados,
+    listar_feriados,
+)
+from src.core.usuarios import listar_coordinadores
+from src.core.vacaciones import obtener_saldo_vacaciones
+from src.core.validaciones import ValidacionError
 from src.core.solicitudes import (
     TransicionInvalida,
     cambiar_estado,
@@ -406,6 +415,149 @@ def test_dashboard_gerencia():
         print("   (datos de prueba del dashboard eliminados)")
 
 
+def test_vacaciones_feriados():
+    """RF-01: saldo de vacaciones, feriados y validaciones de servidor."""
+    conn = get_connection()
+    if not conn:
+        check("vacaciones y feriados", False, "-> sin conexión")
+        return
+
+    ids = _ids_por_rol(conn)
+    id_consultor = ids.get("Consultor")
+    if not id_consultor:
+        check("vacaciones y feriados", False, "-> no hay consultores")
+        conn.close()
+        return
+
+    fecha_feriado = datetime.date(2099, 8, 15)
+    id_feriado = None
+    id_solicitud = None
+    try:
+        # Feriados sembrados y exclusión del conteo.
+        df_feriados = listar_feriados(2026)
+        check(
+            "feriados: semilla 2026 incluye Navidad",
+            datetime.date(2026, 12, 25) in set(df_feriados["fecha"].tolist()),
+        )
+        feriados_navidad = fechas_feriados(
+            datetime.date(2026, 12, 24), datetime.date(2026, 12, 28)
+        )
+        check(
+            "feriados: se excluyen del cálculo de días hábiles",
+            datetime.date(2026, 12, 25) in feriados_navidad
+            and calcular_dias_habiles(
+                datetime.date(2026, 12, 24),
+                datetime.date(2026, 12, 28),
+                feriados_navidad,
+            )
+            == 2,
+        )
+
+        # CRUD temporal del catálogo.
+        id_feriado = crear_feriado(fecha_feriado, "Feriado smoke")
+        check(
+            "feriados: alta y consulta por rango",
+            fecha_feriado
+            in fechas_feriados(fecha_feriado, fecha_feriado),
+        )
+        check("feriados: baja del catálogo", eliminar_feriado(id_feriado) is True)
+        id_feriado = None
+
+        # Saldo de vacaciones (año 2031, sin datos previos).
+        saldo_inicial = obtener_saldo_vacaciones(id_consultor, anio=2031)
+        check(
+            "vacaciones: saldo = asignados - usados",
+            saldo_inicial["disponibles"]
+            == saldo_inicial["asignados"] - saldo_inicial["usados"],
+            f"-> {saldo_inicial}",
+        )
+
+        id_solicitud = registrar_solicitud(
+            id_consultor,
+            "VACACION",
+            datetime.date(2031, 1, 6),
+            datetime.date(2031, 1, 7),
+            "Jefe GTC",
+            "Consultor",
+            "C-001",
+            2,
+            f"TEST_VACACIONES_{uuid4().hex[:8]}",
+            firma_dummy_b64(),
+        )
+        saldo_despues = obtener_saldo_vacaciones(id_consultor, anio=2031)
+        check(
+            "vacaciones: el registro descuenta los días",
+            saldo_despues["usados"] == saldo_inicial["usados"] + 2,
+            f"-> usados={saldo_despues['usados']}",
+        )
+
+        try:
+            registrar_solicitud(
+                id_consultor,
+                "VACACION",
+                datetime.date(2031, 2, 3),
+                datetime.date(2031, 2, 28),
+                "Jefe GTC",
+                "Consultor",
+                "C-001",
+                20,
+                f"TEST_EXCESO_{uuid4().hex[:8]}",
+                firma_dummy_b64(),
+            )
+        except ValidacionError:
+            check("vacaciones: saldo insuficiente rechazado", True)
+        else:
+            check("vacaciones: saldo insuficiente rechazado", False)
+
+        try:
+            registrar_solicitud(
+                id_consultor,
+                "DUELO",
+                datetime.date(2031, 3, 10),
+                datetime.date(2031, 3, 9),
+                "Jefe GTC",
+                "Consultor",
+                "C-001",
+                1,
+                f"TEST_FECHAS_{uuid4().hex[:8]}",
+                firma_dummy_b64(),
+            )
+        except ValidacionError:
+            check("validación: fechas invertidas rechazadas", True)
+        else:
+            check("validación: fechas invertidas rechazadas", False)
+
+        coordinadores = listar_coordinadores()
+        check(
+            "jefe GTC: se selecciona desde usuarios del rol",
+            not coordinadores.empty
+            and "nombre_completo" in coordinadores.columns,
+            f"-> {len(coordinadores)} coordinador(es)",
+        )
+    except Exception as e:
+        check("vacaciones y feriados", False, f"-> {e}")
+    finally:
+        if id_feriado is not None:
+            try:
+                eliminar_feriado(id_feriado)
+            except Exception:
+                pass
+        cursor = conn.cursor()
+        if id_solicitud:
+            cursor.execute(
+                "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
+            )
+        cursor.execute(
+            "DELETE FROM solicitud WHERE explicacion LIKE 'TEST_VACACIONES_%' "
+            "OR explicacion LIKE 'TEST_EXCESO_%' "
+            "OR explicacion LIKE 'TEST_FECHAS_%'"
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("   (datos de prueba de vacaciones y feriados eliminados)")
+
+
 def test_vigencia():
     """Baja lógica semestral, auditoría y reactivación, con limpieza posterior."""
     conn = get_connection()
@@ -539,6 +691,7 @@ if __name__ == "__main__":
     test_pdf()
     test_consultor_flujo()
     test_dashboard_gerencia()
+    test_vacaciones_feriados()
     test_vigencia()
 
     fallidos = [r for r in resultados if r[0] == "FAIL"]

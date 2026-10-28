@@ -8,7 +8,11 @@ from src.core.database import get_connection
 from src.services.documentos import generar_pdf_solicitud
 from src.core.security import rol_autorizado
 from src.core.catalogos import OPCIONES_AUSENCIA
+from src.core.feriados import fechas_feriados
+from src.core.usuarios import listar_coordinadores
 from src.core.utils import calcular_dias_habiles
+from src.core.vacaciones import TIPO_VACACION, obtener_saldo_vacaciones
+from src.core.validaciones import ValidacionError
 from src.core.solicitudes import registrar_solicitud, obtener_historial
 
 def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, jefe, puesto, codigo, dias, exp, firma_b64):
@@ -21,6 +25,9 @@ def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, jefe, puesto, codigo,
         return registrar_solicitud(
             id_us, tipo, f_ini, f_fin, jefe, puesto, codigo, dias, exp, firma_b64
         )
+    except ValidacionError as e:
+        st.error(f"❌ {e}")
+        return None
     except Exception as e:
         st.error(f"Error BD: {e}")
         return None
@@ -47,6 +54,27 @@ def mostrar_formulario():
         return
     from streamlit_drawable_canvas import st_canvas  # import perezoso: requiere el runtime
     st.markdown("### Panel Operativo - Acción de Personal")
+
+    # RF-01: saldo de vacaciones del consultor (D-03: asignado - usado).
+    saldo_vacaciones = None
+    try:
+        saldo_vacaciones = obtener_saldo_vacaciones(st.session_state["id_usuario"])
+    except Exception as e:
+        st.warning(f"No se pudo calcular el saldo de vacaciones: {e}")
+    else:
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric("Vacaciones disponibles", saldo_vacaciones["disponibles"])
+        col_b.metric("Días asignados", saldo_vacaciones["asignados"])
+        col_c.metric("Días usados", saldo_vacaciones["usados"])
+        st.caption(
+            f"Saldo del año {saldo_vacaciones['anio']} "
+            "(días asignados menos días solicitados como VACACION)."
+        )
+        if saldo_vacaciones["disponibles"] < 0:
+            st.error(
+                "Su saldo de vacaciones está excedido; contacte a Gerencia "
+                "antes de registrar otra solicitud."
+            )
     
     # Manejo de estados para la navegación
     if 'solicitud_enviada' not in st.session_state:
@@ -75,16 +103,50 @@ def mostrar_formulario():
             st.info("Complete el formulario. Al firmar electrónicamente, la solicitud se enviará al Coordinador GTC para su visto bueno.")
             col1, col2 = st.columns(2)
             with col1:
-                jefe_gtc = st.text_input("PARA: (Nombre del Jefe Inmediato GTC)")
+                coordinadores = listar_coordinadores()
+                opciones_jefe = coordinadores["nombre_completo"].tolist()
+                if opciones_jefe:
+                    jefe_gtc = st.selectbox(
+                        "PARA: (Jefe Inmediato GTC)", opciones_jefe
+                    )
+                else:
+                    st.warning(
+                        "No hay usuarios vigentes con rol Coordinador GTC. "
+                        "Escriba el nombre manualmente."
+                    )
+                    jefe_gtc = st.text_input(
+                        "PARA: (Nombre del Jefe Inmediato GTC)"
+                    )
                 puesto = st.text_input("PUESTO:")
                 fecha_inicio = st.date_input("Fecha de Inicio (Del:)", min_value=datetime.date.today())
             with col2:
                 codigo = st.text_input("CÓDIGO:")
                 tipo_ausencia = st.selectbox("NATURALEZA DE LA ACCIÓN:", OPCIONES_AUSENCIA)
-                fecha_fin = st.date_input("Fecha de Fin (Al:)", min_value=fecha_inicio)
-            
-            dias_solicitados = calcular_dias_habiles(fecha_inicio, fecha_fin)
+                fecha_fin = st.date_input(
+                    "Fecha de Fin (Al:)",
+                    value=fecha_inicio,
+                    min_value=fecha_inicio,
+                )
+
+            feriados_rango = set()
+            if fecha_fin < fecha_inicio:
+                st.error(
+                    "❌ La fecha de fin no puede ser anterior a la fecha de inicio."
+                )
+                dias_solicitados = 0
+            else:
+                feriados_rango = fechas_feriados(fecha_inicio, fecha_fin)
+                dias_solicitados = calcular_dias_habiles(
+                    fecha_inicio, fecha_fin, feriados_rango
+                )
             st.metric(label="Cantidad de Días Hábiles a Solicitar", value=dias_solicitados)
+            if feriados_rango:
+                st.caption(
+                    "Se excluyen "
+                    f"{len(feriados_rango)} feriado(s): "
+                    + ", ".join(sorted(f.isoformat() for f in feriados_rango))
+                    + "."
+                )
             
             explicacion = st.text_area("EXPLICACIÓN DE LA ACCIÓN:", height=100)
             st.write("---")
@@ -97,7 +159,17 @@ def mostrar_formulario():
                         if not jefe_gtc or not explicacion:
                             st.error("❌ Llene todos los campos para proceder.")
                         elif dias_solicitados == 0:
-                            st.error("❌ El rango seleccionado no contiene días hábiles (solo fines de semana).")
+                            st.error("❌ El rango seleccionado no contiene días hábiles (solo fines de semana o feriados).")
+                        elif (
+                            tipo_ausencia == TIPO_VACACION
+                            and saldo_vacaciones is not None
+                            and dias_solicitados > saldo_vacaciones["disponibles"]
+                        ):
+                            st.error(
+                                "❌ Saldo de vacaciones insuficiente: solicita "
+                                f"{dias_solicitados} día(s) y solo tiene "
+                                f"{saldo_vacaciones['disponibles']} disponible(s)."
+                            )
                         else:
                             st.session_state.mostrar_canvas_firma = True
                             st.rerun()

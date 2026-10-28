@@ -42,12 +42,17 @@ proyecto_setesa/
 │   │   ├── vigencia.py        # Baja lógica, auditoría y reactivación
 │   │   ├── catalogos.py       # Tipos de ausencia
 │   │   ├── reportes.py        # Filtros, KPIs y exportación CSV
+│   │   ├── feriados.py        # Catálogo de feriados
+│   │   ├── vacaciones.py      # Saldo de vacaciones
+│   │   ├── validaciones.py    # Reglas de fechas y saldo
+│   │   ├── usuarios.py        # Usuarios por rol
 │   │   ├── utils.py           # Días hábiles
 │   │   └── config.py          # Rutas de storage
 │   ├── features/
 │   │   ├── registro.py        # Panel del Consultor
 │   │   ├── coordinador.py     # Portal de aprobaciones GTC
 │   │   ├── dashboard.py       # Panel gerencial + filtros + descargas
+│   │   ├── feriados.py        # Administración de feriados
 │   │   └── vigencia.py        # Panel de auditoría y baja semestral
 │   └── services/
 │       ├── documentos.py      # PDF desde la BD + ruta_pdf + descarga
@@ -57,6 +62,7 @@ proyecto_setesa/
 │   ├── backup_datos.py        # Respaldo lógico en JSON
 │   ├── migracion_fase1.py     # Historial + normalización de estados
 │   ├── migracion_fase3.py     # vigencia_log + restricciones
+│   ├── migracion_fase5.py     # saldo de vacaciones + feriados
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a PBKDF2
 ├── tests/
@@ -69,6 +75,9 @@ proyecto_setesa/
 │   ├── test_vigencia.py
 │   ├── test_reportes.py       # Filtros, KPIs y CSV
 │   ├── test_dashboard_integration.py  # Repositorio + PDF final
+│   ├── test_feriados.py       # Catálogo de feriados
+│   ├── test_vacaciones.py     # Saldo de vacaciones
+│   ├── test_validaciones.py   # Reglas de fechas y saldo
 │   ├── test_app_smoke.py
 │   └── smoke_test.py          # Prueba E2E manual
 ├── docs/
@@ -122,8 +131,8 @@ psql "$env:DATABASE_URL" -f docs/schema.sql
 ```
 
 Crea `rol`, `usuario`, `solicitud`, `solicitud_historial`, `vigencia_log`,
-índices y los tres roles base. Los usuarios se crean aparte (ver
-`scripts/hash_passwords.py`).
+`feriado`, índices, los tres roles base y la semilla de feriados. Los usuarios se
+crean aparte (ver `scripts/hash_passwords.py`).
 
 ### Opción B — Base existente (recomendado para este repositorio)
 
@@ -136,6 +145,9 @@ Crea `rol`, `usuario`, `solicitud`, `solicitud_historial`, `vigencia_log`,
 
 # 3. Migración de vigencia: vigencia_log, CHECK e índices
 .\venv\Scripts\python.exe scripts\migracion_fase3.py
+
+# 4. Migración de vacaciones y feriados: columna, tabla y semilla
+.\venv\Scripts\python.exe scripts\migracion_fase5.py
 ```
 
 La migración de la Fase 1:
@@ -143,6 +155,11 @@ La migración de la Fase 1:
 - normaliza estados fuera de catálogo;
 - registra el estado inicial de las solicitudes existentes;
 - agrega `NOT NULL`, `CHECK` e índices sobre `estado_workflow`.
+
+La migración de la Fase 5:
+- agrega `usuario.dias_vacaciones_asignados` (15 por defecto, `CHECK >= 0`);
+- crea la tabla `feriado` con fecha única;
+- siembra los feriados nacionales de 2025–2027.
 
 La migración de la Fase 3:
 - crea `vigencia_log` para auditar depuraciones y reactivaciones;
@@ -165,7 +182,7 @@ La aplicación abre en `http://localhost:8501`.
 |---|---|---|
 | `Consultor` | Formulario + historial | Registra, firma y descarga su solicitud |
 | `Coordinador GTC` | Portal de aprobaciones | Otorga el visto bueno del banco |
-| `Administrador` | Dashboard + vigencia | Autoriza, consulta métricas y depura usuarios |
+| `Administrador` | Dashboard + vigencia + feriados | Autoriza, consulta métricas, depura usuarios y administra feriados |
 
 > Las contraseñas se almacenan con PBKDF2-SHA256. Para crear usuarios, usar el
 > hash generado por `src.core.security.hash_password()`.
@@ -222,6 +239,22 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 
 ---
 
+## Vacaciones y feriados (RF-01)
+
+- Cada usuario tiene `dias_vacaciones_asignados` (15 por defecto) y el panel del
+  consultor muestra **asignados, usados y disponibles** del año.
+- El saldo se calcula como asignados menos los días solicitados como `VACACION`
+  en el año de la solicitud.
+- El catálogo `feriado` (tabla con fecha única) se excluye del cálculo de días
+  hábiles. Gerencia lo administra desde la pestaña **Feriados**.
+- La migración siembra los feriados nacionales de 2025, 2026 y 2027 (incluida la
+  Semana Santa). Los años siguientes se agregan desde el panel.
+- El servidor valida `fecha_fin >= fecha_inicio` y el saldo de vacaciones antes
+  de insertar; el formulario muestra los mismos mensajes.
+- El jefe GTC se selecciona entre los usuarios vigentes con rol Coordinador GTC.
+
+---
+
 ## Vigencia semestral (RF-05 / CU-06)
 
 - Un usuario **activo** con más de 6 meses sin actividad pasa a baja lógica
@@ -263,6 +296,12 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
   fechas), los KPIs y la exportación CSV.
 - `tests/test_dashboard_integration.py` verifica el repositorio, los filtros
   sobre datos reales y la descarga del PDF final con tres firmas.
+- `tests/test_feriados.py` cubre la semilla, el alta/baja y la actualización de
+  nombre del catálogo.
+- `tests/test_vacaciones.py` verifica el saldo, el descuento por solicitud, el
+  rechazo por saldo insuficiente y la separación por año.
+- `tests/test_validaciones.py` cubre fechas invertidas, nulas y rangos sin días
+  hábiles.
 - `tests/test_app_smoke.py` incluye el rechazo de login de un usuario inactivo
   (QA-01).
 - `tests/test_utils_firma.py` verifica nombres temporales únicos y limpieza.
@@ -277,6 +316,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 | `scripts/backup_datos.py` | Exporta `rol`, `usuario` y `solicitud` a `storage/backups/*.json` |
 | `scripts/migracion_fase1.py` | Migración idempotente de la Fase 1 |
 | `scripts/migracion_fase3.py` | Crea `vigencia_log` y sus restricciones |
+| `scripts/migracion_fase5.py` | Agrega el saldo de vacaciones y el catálogo de feriados |
 | `scripts/vigencia_semestral.py` | Ejecuta la baja lógica si venció el semestre (`--forzar` para pruebas) |
 | `scripts/hash_passwords.py` | Convierte contraseñas heredadas a PBKDF2 |
 
@@ -301,12 +341,13 @@ El avance detallado, las brechas y el plan por fases están en
 
 Fases completadas: **0 (línea base)**, **1 (coherencia del workflow)**,
 **2 (firmas completas)**, **3 (vigencia robusta: baja lógica auditable,
-ejecución semestral y reactivación)** y **4 (dashboard completo: filtros, KPIs,
-alertas, descarga del PDF final y exportación CSV)**.
-Siguiente: **Fase 5 — RF-01 y validaciones de negocio (saldo de vacaciones,
-fechas, feriados y jefe GTC)**.
+ejecución semestral y reactivación)**, **4 (dashboard completo: filtros, KPIs,
+alertas, descarga del PDF final y exportación CSV)** y **5 (saldo de vacaciones,
+feriados administrables, validaciones de servidor y jefe GTC desde usuarios)**.
+Siguiente: **Fase 6 — RNF y cierre (cifrado, sello SHA-256, SQLAlchemy, logging
+y CI)**.
 
-Cierre actual de calidad: **64 pruebas pytest** y **43/43** checks del smoke test,
+Cierre actual de calidad: **83 pruebas pytest** y **52/52** checks del smoke test,
 sin datos de prueba residuales en la base.
 
 ---
