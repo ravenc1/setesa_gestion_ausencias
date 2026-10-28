@@ -2,8 +2,11 @@
 
 import streamlit as st
 from src.core.database import get_connection
+from src.core.logging_config import obtener_logger
 from src.core.security import verify_or_upgrade
 from src.core.vigencia import ejecutar_si_corresponde, marcar_actividad
+
+logger = obtener_logger("setesa.auth")
 
 def login_user(email, password):
     conn = get_connection()
@@ -24,6 +27,7 @@ def login_user(email, password):
         if not user:
             cursor.close()
             conn.close()
+            logger.warning("Login fallido: correo no registrado (%s)", correo)
             return None
 
         id_usuario, nombre, estado_vigencia, rol, password_hash = user
@@ -44,9 +48,12 @@ def login_user(email, password):
         conn.close()
 
         if not valido:
+            logger.warning("Login fallido: contraseña incorrecta (%s)", correo)
             return None
+        logger.info("Login exitoso: usuario %s (%s)", id_usuario, rol)
         return (id_usuario, nombre, estado_vigencia, rol)
     except Exception as e:
+        logger.exception("Error al ejecutar la consulta de login")
         st.error(f"Error en la ejecución de la consulta: {e}")
         return None
 
@@ -70,6 +77,9 @@ def show_login():
                     id_usuario, nombre, estado_vigencia, rol = user_data
                     
                     if not estado_vigencia:
+                        logger.warning(
+                            "Login rechazado: usuario %s inactivo", id_usuario
+                        )
                         st.error("Acceso denegado: Usuario inactivo (Baja Lógica).")
                     else:
                         st.session_state['logged_in'] = True

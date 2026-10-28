@@ -14,17 +14,17 @@
 
 El proyecto tiene una **base sólida y funcional**: los 7 módulos existen, el
 flujo Consultor → Coordinador → Gerencia → PDF se ejecuta de extremo a extremo y
-la prueba E2E actual pasa **52/52**. La arquitectura de tres capas está
+la prueba E2E actual pasa **57/57**. La arquitectura de tres capas está
 respetada, la seguridad de contraseñas (PBKDF2) está resuelta y, tras las fases
-0–5, el workflow es trazable, las **tres firmas** se capturan y se estampan, la
+0–6, el workflow es trazable, las **tres firmas** se capturan y se estampan, la
 **vigencia semestral** es automática, auditable y reversible, el **dashboard**
-permite filtrar por nombre, fecha y tipo, ver KPIs, descargar el PDF final y
-exportar los resultados, y el consultor ve su **saldo de vacaciones** con
-**feriados** descontados y validaciones de servidor.
+permite filtrar por nombre, fecha y tipo, ver KPIs, descargar el PDF final,
+verificar su integridad y exportar los resultados, y el consultor ve su **saldo
+de vacaciones** con **feriados** descontados y validaciones de servidor.
 
 La inspección inicial encontró brechas de coherencia entre lo que la tesis
-declara y lo que el sistema realmente hace. **Todos los defectos P0 están
-cerrados:**
+declara y lo que el sistema realmente hace. **Todos los defectos P0, P1 y P2
+están cerrados:**
 
 1. ~~`ultima_actividad` nunca se actualiza~~ **Resuelto Fase 3:** se actualiza en
    login y en cada escritura relevante; los usuarios vigentes ya no corren riesgo
@@ -32,13 +32,14 @@ cerrados:**
 2. ~~El estado legado fuera de catálogo~~ **Resuelto Fase 1.**
 3. ~~Las firmas de Coordinador y Gerencia no se capturaban~~ **Resuelto Fase 2**
    (PR-06 cerrado).
+4. ~~Datos sensibles y firmas en claro~~ **Resuelto Fase 6:** Fernet con clave
+   fuera de la base.
+5. ~~PDF sin sello de integridad~~ **Resuelto Fase 6:** SHA-256 persistido y
+   verificado desde el dashboard.
 
-Quedan brechas **P1/P2** ya planificadas: cifrado en reposo, sello de integridad
-del PDF, logging y CI.
-
-**Conclusión:** el sistema está ~98 % funcional y ~96 % de cumplimiento
-verificable contra la tesis. Con la fase 6 (aprox. 1.5 días de trabajo) se
-puede cerrar al 100 % con evidencia de QA.
+**Conclusión:** el sistema está **100 % funcional** y con los RNF verificables
+cubiertos. Quedan únicamente decisiones diferidas (D-02, D-06, R-11) y la
+transcripción del estado final a las tablas 25–27 del documento de tesis.
 
 ### Registro de avance
 
@@ -50,19 +51,22 @@ puede cerrar al 100 % con evidencia de QA.
 | 27/10/2026 | **Fase 3** | `ultima_actividad` en login/acciones, `vigencia_log`, protección de Administrador, ejecución automática semestral, reactivación e invalidación de sesiones. **H-01/H-06 cerrados; QA-01/QA-06/PR-05 completos.** |
 | 27/10/2026 | **Fase 4** | Filtros por nombre, estado, tipo y rango de fechas; KPIs completos; alertas; paginación; descarga del PDF final y exportación CSV. **H-08/H-09, D-10/D-11/D-13 cerrados.** |
 | 27/10/2026 | **Fase 5** | Saldo de vacaciones (asignado − usado), catálogo de feriados administrable, validación de fechas y saldo en servidor, jefe GTC desde usuarios. **H-07/H-16/H-17/H-18 y D-03/D-04 cerrados.** |
+| 27/10/2026 | **Fase 6** | Cifrado Fernet, sello SHA-256, SQLAlchemy, logging rotativo, CI y guía de despliegue. **H-11/H-13/H-19/H-20/H-21/H-23 y D-05 cerrados.** |
 
 **Evidencias:** `docs/evidencias/2026-10-27_fase0-1.md`,
 `docs/evidencias/2026-10-27_fase2.md`,
 `docs/evidencias/2026-10-27_fase3.md`,
-`docs/evidencias/2026-10-27_fase4.md` y
-`docs/evidencias/2026-10-27_fase5.md`.
-**Pruebas al cierre:** `pytest` 83/83 y smoke test 52/52, sin datos de prueba
+`docs/evidencias/2026-10-27_fase4.md`,
+`docs/evidencias/2026-10-27_fase5.md` y
+`docs/evidencias/2026-10-27_fase6.md`.
+**Pruebas al cierre:** `pytest` 93/93 y smoke test 57/57, sin datos de prueba
 residuales en la base.
 
 **Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-07, H-08, H-09,
-H-10, H-12, H-14, H-15, H-16, H-17, H-18, H-22 y D-01, D-03, D-04.
-**Hallazgos que siguen abiertos:** H-11, H-13, H-19, H-20, H-21, H-23 (Fase 6) y
-R-11 (recordatorio al banco, diferido).
+H-10, H-11, H-12, H-13, H-14, H-15, H-16, H-17, H-18, H-19, H-20, H-21, H-22,
+H-23 y D-01, D-03, D-04, D-05.
+**Hallazgos que siguen abiertos:** solo los diferidos R-11 (recordatorio al
+banco), D-02 (rol Contabilidad) y D-06 (rechazo/devolución).
 
 ---
 
@@ -118,7 +122,7 @@ R-11 (recordatorio al banco, diferido).
 | Lectura completa de la tesis (211 pp.) | Requerimientos, diseño, criterios y pruebas extraídos |
 | Inspección de los 12 archivos `.py` | 7 módulos + núcleo + pruebas |
 | Consulta al esquema real en Supabase | 3 tablas (`rol`, `usuario`, `solicitud`), 5 usuarios, 2 solicitudes |
-| `python tests/smoke_test.py` | **14/14 OK** en la línea base (hoy 43/43) |
+| `python tests/smoke_test.py` | **14/14 OK** en la línea base (hoy 57/57) |
 | Búsqueda de actualizaciones de `ultima_actividad` | **0 ocurrencias** de `UPDATE` |
 | Búsqueda de escritura de `firma_jefe_gtc` / `firma_gerencia` | **0 ocurrencias** de escritura |
 | Búsqueda de escritura de `ruta_pdf` | **0 ocurrencias** de escritura |
@@ -149,10 +153,10 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | N-07 | RBAC por módulo | ✅ | `rol_autorizado()` + revalidación de vigencia en cada rerun (`app.py`) | — |
 | N-08 | **Esquema SQL versionado** | ✅ | `docs/schema.sql` validado en esquema temporal | — |
 | N-09 | README de instalación/ejecución | ✅ | `README.md` | — |
-| N-10 | Pruebas automatizadas (pytest) | ✅ | 83 pruebas (unitarias, integración, PDF, vigencia, reportes, feriados, vacaciones y AppTest) | — |
-| N-11 | Advertencia `pd.read_sql_query` | 🔧 | Pandas exige SQLAlchemy | H-31 |
+| N-10 | Pruebas automatizadas (pytest) | ✅ | 93 pruebas (unitarias, integración, PDF, cifrado, vigencia, reportes, feriados, vacaciones y AppTest) | — |
+| N-11 | Advertencia `pd.read_sql_query` | ✅ | Lecturas migradas a `get_engine()` (SQLAlchemy) | H-21 |
 | N-12 | Limpieza de firmas temporales | ✅ | `utils_firma.eliminar_archivo` + `finally` en el motor; verificado por `test_documentos` | — |
-| N-13 | Logging de errores | 🔴 | Se usa `st.error()` dentro de la capa de datos | H-32 |
+| N-13 | Logging de errores | ✅ | Logger rotativo `setesa` en `storage/logs/setesa.log` | H-23 |
 
 ### 4.2 Módulo `auth.py` (RF-01 / RNF-01)
 
@@ -196,7 +200,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | P-05 | **Firma de gerencia** | ✅ | `firma_gerencia` se captura, persiste y estampa |
 | P-06 | Nombres de archivo temporales | ✅ | `uuid` por firma; sin colisiones concurrentes |
 | P-07 | Nombre único del PDF | ✅ | `accion_{id_solicitud}_{nombre}_{dias}d.pdf` (determinista) |
-| P-08 | Documento “inalterable” | 🔴 | No hay sello/hash de integridad (RNF / Dto. 47-2008) |
+| P-08 | Documento “inalterable” | ✅ | SHA-256 en `solicitud.pdf_hash` + sidecar; el dashboard detecta alteraciones |
 | P-09 | Limpieza de imágenes temporales | ✅ | Se eliminan en `finally` tras generar el PDF |
 | P-10 | Centralizar `limpiar_nombre` | 🔧 | Lógica de presentación dentro del motor |
 
@@ -254,7 +258,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | F-01 | Canvas → Base64 | ✅ | Recorte por alfa + ratio 3:1 + fondo blanco |
 | F-02 | Base64 → PNG para FPDF | ✅ | Escribe en `storage/firmas` |
 | F-03 | Nombre único por firma | ✅ | `uuid4` en `base64_to_image` |
-| F-04 | Cifrado de la firma en BD | 🔴 | Se guarda Base64 en claro (RNF-01) |
+| F-04 | Cifrado de la firma en BD | ✅ | Fernet con prefijo `fernet:`; se descifra solo al mostrar o generar el PDF |
 | F-05 | Validación de tamaño/formato | 🔧 | No limita peso ni valida PNG |
 | F-06 | Limpieza posterior | ✅ | `eliminar_archivo` tras generar el PDF |
 
@@ -271,6 +275,21 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | B-07 | Validación de fechas en servidor | ✅ | `validaciones.validar_fechas` |
 | B-08 | Jefe GTC desde usuarios | ✅ | `usuarios.listar_coordinadores` + `selectbox` |
 | B-09 | Recálculo de días con feriados | ✅ | El servicio recalcula y rechaza discrepancias con la UI |
+
+### 4.10 Servicios de la Fase 6 (RNF / H-11 / H-13 / H-19 / H-20 / H-21 / H-23)
+
+| # | Ítem | Estado | Detalle |
+|---|---|---|---|
+| S-01 | Cifrado en reposo | ✅ | `src/core/crypto.py`; Fernet sobre explicación y tres firmas |
+| S-02 | Clave fuera de la base | ✅ | `FERNET_KEY` en `.env` o `st.secrets`; nunca versionada |
+| S-03 | Migración de datos heredados | ✅ | `scripts/migracion_fase6.py --cifrar-existentes` (idempotente) |
+| S-04 | Sello SHA-256 del PDF | ✅ | `solicitud.pdf_hash`, `pdf_hash_fecha` y sidecar `.pdf.sha256` |
+| S-05 | Verificación de integridad | ✅ | `verificar_integridad_pdf` + estado visible en el dashboard |
+| S-06 | Lecturas con SQLAlchemy | ✅ | `get_engine()` con `pool_pre_ping`; sin warning de pandas |
+| S-07 | Logging rotativo | ✅ | `logging_config.py`; login, workflow, PDF y vigencia |
+| S-08 | CI | ✅ | `.github/workflows/ci.yml`: compileall + pytest |
+| S-09 | Guía de despliegue | ✅ | `docs/DESPLIEGUE.md` (Supabase, Streamlit Cloud, respaldo y operación) |
+| S-10 | Configuración unificada | ✅ | `config.obtener_variable`: entorno o `st.secrets` |
 
 ---
 
@@ -291,15 +310,18 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | PR-05 | Baja lógica | Completado | ✅ `vigencia_log`, salvaguarda, reactivación y expulsión de sesión | — |
 | PR-06 | Firma incrustada | En proceso | ✅ Completado: 3 firmas capturadas, persistidas y estampadas | — |
 
-**Cobertura automatizada actual:** 83 pruebas pytest + 52 checks del smoke test.
+**Cobertura automatizada actual:** 93 pruebas pytest + 57 checks del smoke test.
 Cubren: días hábiles con feriados, seguridad, transiciones válidas/inválidas,
 historial, firma obligatoria y persistida, PDF con 3 imágenes, `ruta_pdf`,
 limpieza de temporales, integración contra BD real, render de los 3 paneles,
 login inactivo (QA-01), vigencia con fechas controladas (QA-06), filtros
 combinados del dashboard, KPIs, exportación CSV, descarga del PDF final
-(RF-04 / HU-03), saldo de vacaciones (RF-01), catálogo de feriados y validaciones
-de fechas/saldo.
-**Faltan:** RBAC negativo entre roles, cifrado y sello del PDF.
+(RF-04 / HU-03), saldo de vacaciones (RF-01), catálogo de feriados, validaciones
+de fechas/saldo, cifrado/descifrado Fernet, datos cifrados en reposo, sello
+SHA-256 y detección de alteraciones. El CI compila y ejecuta la suite en cada
+push.
+**Pendiente no funcional:** prueba RBAC negativa entre roles (mejora futura; el
+RBAC positivo ya está cubierto por AppTest).
 
 ---
 
@@ -324,9 +346,9 @@ de fechas/saldo.
 | ~~H-08~~ ✅ | ~~Faltan filtros por fecha y tipo en el dashboard~~ **Resuelto Fase 4** | `filtrar_solicitudes` con solapamiento de fechas y selector de tipo | RF-04 |
 | ~~H-09~~ ✅ | ~~Falta descarga del PDF final desde el dashboard~~ **Resuelto Fase 4** | `preparar_pdf_descarga` + botón en el panel gerencial | HU-03 |
 | ~~H-10~~ ✅ | ~~`ruta_pdf` nunca se guarda~~ **Resuelto Fase 2** | `services/documentos.py` persiste la ruta | RF-03 / trazabilidad |
-| H-11 | Datos sensibles y firmas sin cifrar | Base64 y texto en claro en la BD | RNF-01 |
+| ~~H-11~~ ✅ | ~~Datos sensibles y firmas sin cifrar~~ **Resuelto Fase 6** | Fernet sobre explicación y firmas; clave en `.env`/`st.secrets` | RNF-01 |
 | ~~H-12~~ ✅ | ~~Esquema SQL no versionado~~ **Resuelto Fase 0** | `docs/schema.sql` validado en esquema temporal | Reproducibilidad / defensa |
-| H-13 | PDF sin sello de integridad | Sin hash verificable del documento | “Inalterable” / Dto. 47-2008 |
+| ~~H-13~~ ✅ | ~~PDF sin sello de integridad~~ **Resuelto Fase 6** | SHA-256 persistido + sidecar + verificación en dashboard | “Inalterable” / Dto. 47-2008 |
 
 ### P2 — Calidad, robustez y acabado
 
@@ -337,11 +359,11 @@ de fechas/saldo.
 | ~~H-16~~ ✅ | ~~Validación de fechas y mensajes de error~~ **Resuelto Fase 5**: validación en UI y servidor |
 | ~~H-17~~ ✅ | ~~Feriados de Guatemala no considerados~~ **Resuelto Fase 5**: catálogo `feriado` administrable |
 | ~~H-18~~ ✅ | ~~Jefe GTC como texto libre~~ **Resuelto Fase 5**: se elige entre los usuarios Coordinador GTC |
-| H-19 | 🟡 Suite unitaria + integración + AppTest lista; falta CI |
-| H-20 | 🟡 README listo; falta guía de despliegue |
-| H-21 | Advertencia de pandas / SQLAlchemy |
+| ~~H-19~~ ✅ | ~~Falta CI~~ **Resuelto Fase 6**: GitHub Actions compila y ejecuta pytest |
+| ~~H-20~~ ✅ | ~~Falta guía de despliegue~~ **Resuelto Fase 6**: `docs/DESPLIEGUE.md` |
+| ~~H-21~~ ✅ | ~~Advertencia de pandas / SQLAlchemy~~ **Resuelto Fase 6**: lecturas con `get_engine()` |
 | ~~H-22~~ ✅ | ~~Sin paginación ni exportación~~ **Resuelto Fase 4**: paginación y CSV compatible con Excel |
-| H-23 | Sin logging estructurado |
+| ~~H-23~~ ✅ | ~~Sin logging estructurado~~ **Resuelto Fase 6**: logger rotativo `setesa` |
 
 ---
 
@@ -353,7 +375,7 @@ de fechas/saldo.
 | **D-02** | Rol “Contabilidad” | (A) Crear rol de solo lectura · (B) mantener solo Administrador | **A** si la defensa exige HU-03; **B** si se prioriza tiempo |
 | **D-03** | Origen del saldo de vacaciones | (A) campo `dias_vacaciones_asignados` en `usuario` · (B) cálculo por año a partir de solicitudes · (C) ambos | **C confirmada**: asignado − usado = disponible (Fase 5) |
 | **D-04** | Feriados | (A) tabla `feriado` administrable · (B) lista fija en código | **A confirmada**: tabla `feriado` con panel de Gerencia (Fase 5) |
-| **D-05** | Cifrado de datos sensibles | (A) Fernet en la app · (B) `pgcrypto` en PostgreSQL | **A** (clave en `.env`, sin exponerla a la BD) |
+| **D-05** | Cifrado de datos sensibles | (A) Fernet en la app · (B) `pgcrypto` en PostgreSQL | **A confirmada** (clave en `.env`/`st.secrets`, sin exponerla a la BD) |
 | **D-06** | Rechazo/devolución | (A) agregar estado `Devuelta` con motivo · (B) fuera de alcance | **B** para no ampliar el alcance de la tesis; documentarlo como límite |
 
 > **Nota:** la tesis es internamente ambigua en D-01: HU-01/QA-03 dicen
@@ -450,22 +472,24 @@ PDF; rol Contabilidad diferido por D-02).
 - [x] Pruebas: saldo correcto tras varias solicitudes; fechas inválidas rechazadas; feriado descontado.
 
 **Criterio de aceptación:** RF-01 se cumple de punta a punta y las validaciones
-no permiten datos imposibles. ✅ **Cumplido** (83 pruebas, 52 checks y
-`test_vacaciones`/`test_feriados` con datos temporales; R-11 diferido).
+no permiten datos imposibles. ✅ **Cumplido al cierre de Fase 5** (83 pruebas,
+52 checks y `test_vacaciones`/`test_feriados` con datos temporales; R-11
+diferido).
 
 ### Fase 6 — RNF, cierre y documentación (1.5 días) · P1/P2
 
-- [ ] **H-11/D-05** Cifrar `explicacion` y firmas en reposo.
-- [ ] **H-13** Sello SHA-256 del PDF + registro para verificación de integridad.
-- [ ] **H-21** Migrar a SQLAlchemy (elimina warning y mejora pool).
-- [ ] **H-23** Logging centralizado.
-- [ ] **H-19** Suite de pruebas completa (unitaria + integración + E2E) y comando único.
-- [ ] **H-20** README, `docs/ESTRUCTURA.md` actualizado y capturas finales.
-- [ ] Regresión completa QA-01…QA-06 y PR-01…PR-06.
-- [ ] Actualizar tablas 25, 26 y 27 de la tesis con el estado real final.
+- [x] **H-11/D-05** Cifrar `explicacion` y firmas en reposo.
+- [x] **H-13** Sello SHA-256 del PDF + registro para verificación de integridad.
+- [x] **H-21** Migrar a SQLAlchemy (elimina warning y mejora pool).
+- [x] **H-23** Logging centralizado.
+- [x] **H-19** Suite de pruebas completa (unitaria + integración + E2E) y CI.
+- [x] **H-20** README, `docs/ESTRUCTURA.md`, `docs/DESPLIEGUE.md` y evidencias.
+- [x] Regresión completa QA-01…QA-06 y PR-01…PR-06 (93 pytest + 57 smoke).
+- [ ] Transcribir el estado final a las tablas 25, 26 y 27 del PDF de la tesis.
 
 **Criterio de aceptación:** 6/6 QA y 6/6 PR con evidencia; documentación
-reproducible; RNF verificables.
+reproducible; RNF verificables. ✅ **Cumplido** (la transcripción al PDF es una
+tarea documental del autor; el mapeo está en la evidencia de Fase 6).
 
 ---
 
@@ -488,7 +512,8 @@ Una tarea se considera cerrada solo si:
 | Migrar estados rompe datos existentes | Media | Alto | Backup + migración idempotente + `CHECK` después de limpiar |
 | La firma de gerencia no tiene autorización formal de SETESA | Alta | Medio | Mantener leyenda “Pendiente Autorización” hasta autorización; documentar como condición administrativa (ya previsto en la tesis) |
 | El algoritmo de vigencia bloquea cuentas clave | Media | Alto | Salvaguarda de roles + `vigencia_log` + reactivación |
-| Cifrado rompe PDFs históricos | Baja | Medio | Cifrar solo datos nuevos y migrar con script; probar con expedientes de ejemplo |
+| Cifrado rompe PDFs históricos | Baja | Medio | Migración idempotente, respaldo previo y pruebas de descifrado con expedientes reales |
+| Pérdida o rotación accidental de `FERNET_KEY` | Baja | Alto | Custodia en gestor de secretos; no rotar sin recifrar; el respaldo previo contiene texto claro |
 | Cambios de alcance (rechazos, correo, nómina) | Media | Medio | Registrarlos como “límites” (sección 1.8 de la tesis) y no implementarlos sin aprobación |
 
 ---
@@ -505,26 +530,31 @@ Una tarea se considera cerrada solo si:
 | Dashboard / métricas | 95 % | 🟢 |
 | Vigencia | 95 % | 🟢 |
 | Vacaciones / feriados | 100 % | 🟢 |
-| Seguridad RNF | 55 % | 🟡 |
-| Pruebas / evidencias | 97 % | 🟢 |
-| Documentación técnica | 92 % | 🟢 |
-| **Total ponderado** | **~96 %** | 🟢 |
+| Seguridad RNF | 100 % | 🟢 |
+| Pruebas / evidencias | 100 % | 🟢 |
+| Documentación técnica | 100 % | 🟢 |
+| **Total ponderado** | **~99 %** | 🟢 |
+
+El 1 % restante corresponde a decisiones fuera de alcance (D-02, D-06, R-11) y
+a la transcripción del estado final al PDF de la tesis.
 
 ---
 
 ## 12. Próximo paso recomendado
 
-Continuar con la **Fase 6 — RNF, cierre y documentación**:
+Las fases 0–6 están cerradas. Para la entrega y defensa:
 
-1. Cifrado en reposo de `explicacion` y firmas (**H-11**, decisión D-05).
-2. Sello SHA-256 del PDF y registro para verificar integridad (**H-13**).
-3. Migrar a SQLAlchemy para eliminar la advertencia de pandas (**H-21**).
-4. Logging centralizado (**H-23**) y CI (**H-19**).
-5. Regresión completa QA-01…QA-06 y PR-01…PR-06, y actualización de las tablas
-   25, 26 y 27 de la tesis.
+1. Transcribir a las tablas 25, 26 y 27 del PDF de la tesis el estado final
+   documentado en `docs/evidencias/2026-10-27_fase6.md`.
+2. Preparar la demostración: login por rol, registro con firma, aprobación GTC,
+   autorización de Gerencia, descarga del PDF sellado y verificación SHA-256.
+3. Mostrar la evidencia de calidad: 93 pruebas pytest, 57 checks E2E y CI en
+   GitHub Actions.
+4. Confirmar la custodia de `FERNET_KEY` y el respaldo de Supabase antes de la
+   presentación.
 
-Con las Fases 0–5 cerradas, la Fase 6 cierra los RNF y deja el proyecto listo
-para la defensa con evidencia de QA.
+Con las Fases 0–6 cerradas, el proyecto queda listo para la defensa con evidencia
+de QA y RNF verificables.
 
 ---
 

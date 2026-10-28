@@ -4,7 +4,9 @@ import streamlit as st
 import datetime
 import pandas as pd
 from src.services.utils_firma import canvas_to_base64
-from src.core.database import get_connection
+from src.core.crypto import descifrar_dataframe
+from src.core.database import get_engine
+from src.core.logging_config import obtener_logger
 from src.services.documentos import generar_pdf_solicitud
 from src.core.security import rol_autorizado
 from src.core.catalogos import OPCIONES_AUSENCIA
@@ -14,6 +16,8 @@ from src.core.utils import calcular_dias_habiles
 from src.core.vacaciones import TIPO_VACACION, obtener_saldo_vacaciones
 from src.core.validaciones import ValidacionError
 from src.core.solicitudes import registrar_solicitud, obtener_historial
+
+logger = obtener_logger("setesa.registro")
 
 def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, jefe, puesto, codigo, dias, exp, firma_b64):
     """Inserta la solicitud y su historial en una sola transacción.
@@ -29,24 +33,26 @@ def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, jefe, puesto, codigo,
         st.error(f"❌ {e}")
         return None
     except Exception as e:
+        logger.exception("Error al registrar la solicitud")
         st.error(f"Error BD: {e}")
         return None
 
 def obtener_mis_solicitudes(id_usuario):
-    conn = get_connection()
-    if conn:
-        # Se agregaron las columnas de firma al SELECT para poder inyectarlas en el PDF histórico
-        query = """
-            SELECT id_solicitud, fecha_creacion, tipo_ausencia, fecha_inicio, fecha_fin, 
-                   dias_solicitados, estado_workflow, jefe_gtc, puesto, codigo_empleado, 
-                   explicacion, firma_empleado, firma_jefe_gtc, firma_gerencia 
-            FROM solicitud 
-            WHERE id_usuario = %s ORDER BY fecha_creacion DESC
-        """
-        df = pd.read_sql_query(query, conn, params=(id_usuario,))
-        conn.close()
-        return df
-    return pd.DataFrame()
+    engine = get_engine()
+    if engine is None:
+        return pd.DataFrame()
+
+    # Se agregaron las columnas de firma al SELECT para poder inyectarlas en el PDF histórico.
+    query = """
+        SELECT id_solicitud, fecha_creacion, tipo_ausencia, fecha_inicio, fecha_fin,
+               dias_solicitados, estado_workflow, jefe_gtc, puesto, codigo_empleado,
+               explicacion, firma_empleado, firma_jefe_gtc, firma_gerencia
+        FROM solicitud
+        WHERE id_usuario = %s ORDER BY fecha_creacion DESC
+    """
+    df = pd.read_sql_query(query, engine, params=(id_usuario,))
+    # H-11: los campos sensibles se descifran solo al mostrarlos o generar el PDF.
+    return descifrar_dataframe(df)
 
 def mostrar_formulario():
     if not rol_autorizado(["Consultor"]):

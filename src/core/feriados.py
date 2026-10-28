@@ -8,7 +8,7 @@ import datetime
 
 import pandas as pd
 
-from src.core.database import get_connection
+from src.core.database import get_connection, get_engine
 
 
 class FeriadoError(Exception):
@@ -45,20 +45,17 @@ def fechas_feriados(desde, hasta):
 
 def listar_feriados(anio=None):
     """Devuelve el catálogo ordenado por fecha (opcionalmente por año)."""
-    conn = get_connection()
-    if not conn:
+    engine = get_engine()
+    if engine is None:
         return pd.DataFrame(columns=["id_feriado", "fecha", "nombre"])
 
-    try:
-        query = "SELECT id_feriado, fecha, nombre FROM feriado"
-        params = None
-        if anio is not None:
-            query += " WHERE EXTRACT(YEAR FROM fecha) = %s"
-            params = (int(anio),)
-        query += " ORDER BY fecha"
-        return pd.read_sql_query(query, conn, params=params)
-    finally:
-        conn.close()
+    query = "SELECT id_feriado, fecha, nombre FROM feriado"
+    params = None
+    if anio is not None:
+        query += " WHERE EXTRACT(YEAR FROM fecha) = %s"
+        params = (int(anio),)
+    query += " ORDER BY fecha"
+    return pd.read_sql_query(query, engine, params=params)
 
 
 def crear_feriado(fecha, nombre):

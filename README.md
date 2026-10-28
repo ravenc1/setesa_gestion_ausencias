@@ -18,9 +18,10 @@ aplica la baja lógica semestral de usuarios inactivos.
 |---|---|
 | Presentación | Streamlit + `streamlit-drawable-canvas` |
 | Lógica de negocio | Python 3.13 |
-| Documentos | FPDF |
-| Datos | PostgreSQL (Supabase) |
-| Pruebas | pytest + AppTest + smoke test E2E |
+| Documentos | FPDF + sello SHA-256 |
+| Seguridad | PBKDF2 + Fernet (`cryptography`) |
+| Datos | PostgreSQL (Supabase) + SQLAlchemy |
+| Pruebas | pytest + AppTest + smoke test E2E + GitHub Actions |
 
 ---
 
@@ -35,8 +36,10 @@ proyecto_setesa/
 ├── src/
 │   ├── core/
 │   │   ├── auth.py            # Login y sesión
-│   │   ├── database.py        # Conexión a PostgreSQL
+│   │   ├── database.py        # PostgreSQL: psycopg2 + SQLAlchemy
 │   │   ├── security.py        # PBKDF2 + RBAC
+│   │   ├── crypto.py          # Cifrado Fernet de datos sensibles
+│   │   ├── logging_config.py  # Logging rotativo en storage/logs
 │   │   ├── workflow.py        # Estados y transiciones
 │   │   ├── solicitudes.py     # Servicio transaccional + historial
 │   │   ├── vigencia.py        # Baja lógica, auditoría y reactivación
@@ -47,7 +50,7 @@ proyecto_setesa/
 │   │   ├── validaciones.py    # Reglas de fechas y saldo
 │   │   ├── usuarios.py        # Usuarios por rol
 │   │   ├── utils.py           # Días hábiles
-│   │   └── config.py          # Rutas de storage
+│   │   └── config.py          # Rutas y variables de entorno/secrets
 │   ├── features/
 │   │   ├── registro.py        # Panel del Consultor
 │   │   ├── coordinador.py     # Portal de aprobaciones GTC
@@ -63,12 +66,14 @@ proyecto_setesa/
 │   ├── migracion_fase1.py     # Historial + normalización de estados
 │   ├── migracion_fase3.py     # vigencia_log + restricciones
 │   ├── migracion_fase5.py     # saldo de vacaciones + feriados
+│   ├── migracion_fase6.py     # sello SHA-256 + cifrado de datos heredados
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a PBKDF2
 ├── tests/
 │   ├── test_utils.py
 │   ├── test_workflow.py
 │   ├── test_security.py
+│   ├── test_crypto.py         # Cifrado/descifrado y clave incorrecta
 │   ├── test_utils_firma.py
 │   ├── test_solicitudes_integration.py
 │   ├── test_documentos.py
@@ -83,11 +88,14 @@ proyecto_setesa/
 ├── docs/
 │   ├── ESTRUCTURA.md
 │   ├── CHECKLIST_AVANCE.md    # Estado y plan por fases
+│   ├── DESPLIEGUE.md          # Guía de producción y secrets
 │   ├── schema.sql             # DDL completo
 │   └── evidencias/
+├── .github/workflows/ci.yml   # Compilación + pytest en cada push
 ├── storage/
-│   ├── pdf/                   # PDFs emitidos
+│   ├── pdf/                   # PDFs emitidos + sellos .sha256
 │   ├── firmas/                # Firmas temporales
+│   ├── logs/                  # Logs rotativos (no versionar)
 │   └── backups/               # Respaldos JSON (no versionar)
 └── proyecto_doc/              # Documento de tesis
 ```
@@ -116,9 +124,15 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 # Editar .env y colocar la cadena real de conexión:
 # DATABASE_URL="postgresql://usuario:password@host:5432/basedatos"
+
+# 4. Generar la clave de cifrado y agregarla a .env como FERNET_KEY
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-> `.env` está en `.gitignore`. **Nunca** se versionan credenciales.
+> `.env` está en `.gitignore`. **Nunca** se versionan credenciales ni la
+> `FERNET_KEY`. Si se pierde la clave, los datos cifrados no se recuperan.
+> Para Streamlit Community Cloud, defina `DATABASE_URL` y `FERNET_KEY` en
+> **Secrets**; la app también los lee desde `st.secrets`.
 
 ---
 
@@ -148,6 +162,9 @@ crean aparte (ver `scripts/hash_passwords.py`).
 
 # 4. Migración de vacaciones y feriados: columna, tabla y semilla
 .\venv\Scripts\python.exe scripts\migracion_fase5.py
+
+# 5. Sello SHA-256 y cifrado de registros heredados (una sola vez)
+.\venv\Scripts\python.exe scripts\migracion_fase6.py --cifrar-existentes
 ```
 
 La migración de la Fase 1:
@@ -165,6 +182,12 @@ La migración de la Fase 3:
 - crea `vigencia_log` para auditar depuraciones y reactivaciones;
 - agrega el `CHECK` de acciones y el índice por fecha;
 - garantiza que `usuario.ultima_actividad` sea `NOT NULL`.
+
+La migración de la Fase 6:
+- agrega `solicitud.pdf_hash` y `solicitud.pdf_hash_fecha`;
+- con `--cifrar-existentes`, cifra `explicacion` y las firmas en texto claro;
+- sella los PDFs existentes que tengan ruta pero no hash.
+- Es idempotente; en ejecuciones posteriores use el script sin el flag.
 
 ---
 
@@ -215,7 +238,10 @@ Reglas:
 - El Coordinador GTC y Gerencia deben **firmar en el canvas**: sin firma, la
   transición se rechaza (`FirmaRequerida`).
 - El PDF oficial se genera desde la base con `src/services/documentos.py`, que
-  guarda la ruta en `solicitud.ruta_pdf`.
+  guarda la ruta en `solicitud.ruta_pdf` y su sello SHA-256 en
+  `solicitud.pdf_hash`.
+- La explicación y las tres firmas se guardan **cifradas con Fernet** en la base;
+  se descifran solo al mostrarlas o generar el PDF.
 - Cada login y cada escritura relevante actualizan `usuario.ultima_actividad`.
 
 ---
@@ -231,6 +257,8 @@ Reglas:
 - Tabla paginada (10/25/50/100 filas por página).
 - **Descarga del PDF final** con las tres firmas (HU-03); si el archivo no
   existe, se regenera desde la base.
+- **Verificación de integridad**: muestra si el PDF coincide con el sello
+  SHA-256 registrado, si fue alterado o si aún no tiene sello.
 - **Exportación CSV** del resultado filtrado, con BOM UTF-8 para abrirlo
   directamente en Excel.
 
@@ -288,8 +316,11 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 - Las pruebas de integración se **omiten** si no hay `DATABASE_URL`.
 - `tests/test_app_smoke.py` usa `AppTest` de Streamlit para verificar que el
   login y los tres paneles se rendericen sin excepciones.
-- `tests/test_documentos.py` verifica que el PDF final tenga las tres firmas y
-  que `ruta_pdf` quede persistida.
+- `tests/test_crypto.py` cubre el ciclo cifrar/descifrar, la no recifra, los
+  valores heredados en claro y el rechazo con una clave distinta.
+- `tests/test_documentos.py` verifica que el PDF final tenga las tres firmas,
+  que `ruta_pdf` quede persistida, que el sello SHA-256 detecte alteraciones y
+  que la explicación/firma se guarden cifradas en reposo.
 - `tests/test_vigencia.py` cubre baja lógica, salvaguarda de administradores,
   auditoría, reactivación y login bloqueado con fechas controladas.
 - `tests/test_reportes.py` cubre los filtros (nombre, estado, tipo y rango de
@@ -317,20 +348,30 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 | `scripts/migracion_fase1.py` | Migración idempotente de la Fase 1 |
 | `scripts/migracion_fase3.py` | Crea `vigencia_log` y sus restricciones |
 | `scripts/migracion_fase5.py` | Agrega el saldo de vacaciones y el catálogo de feriados |
+| `scripts/migracion_fase6.py` | Agrega columnas de sello; con `--cifrar-existentes` cifra datos heredados |
 | `scripts/vigencia_semestral.py` | Ejecuta la baja lógica si venció el semestre (`--forzar` para pruebas) |
 | `scripts/hash_passwords.py` | Convierte contraseñas heredadas a PBKDF2 |
 
 ---
 
-## Seguridad
+## Seguridad e integridad
 
 - Contraseñas con PBKDF2-SHA256 (240 000 iteraciones, sal aleatoria).
 - RBAC en la aplicación: cada módulo valida el rol antes de renderizar.
 - Consultas del consultor filtradas por `id_usuario` (no accede a terceros).
-- `.env` y `storage/` fuera del control de versiones.
+- **Cifrado en reposo** de `explicacion`, `firma_empleado`, `firma_jefe_gtc` y
+  `firma_gerencia` con Fernet (AES-128-CBC + HMAC-SHA256). El prefijo `fernet:`
+  distingue los datos cifrados de los heredados.
+- La clave `FERNET_KEY` vive en `.env` o en los secrets del proveedor, nunca en
+  la base ni en el repositorio.
+- **Sello SHA-256** del PDF oficial, persistido en `solicitud.pdf_hash` y en un
+  archivo `.pdf.sha256`; el dashboard detecta alteraciones.
+- `.env`, `.streamlit/secrets.toml` y `storage/` fuera del control de versiones.
+- Logging rotativo en `storage/logs/setesa.log` para login, workflow, PDF y
+  vigencia.
 
-> **Pendiente (Fase 6):** cifrado en reposo de motivos sensibles y firmas, y
-> sello de integridad SHA-256 del PDF. Ver `docs/CHECKLIST_AVANCE.md`.
+> La guía de producción, custodia de la clave y despliegue está en
+> **[`docs/DESPLIEGUE.md`](docs/DESPLIEGUE.md)**.
 
 ---
 
@@ -342,13 +383,14 @@ El avance detallado, las brechas y el plan por fases están en
 Fases completadas: **0 (línea base)**, **1 (coherencia del workflow)**,
 **2 (firmas completas)**, **3 (vigencia robusta: baja lógica auditable,
 ejecución semestral y reactivación)**, **4 (dashboard completo: filtros, KPIs,
-alertas, descarga del PDF final y exportación CSV)** y **5 (saldo de vacaciones,
-feriados administrables, validaciones de servidor y jefe GTC desde usuarios)**.
-Siguiente: **Fase 6 — RNF y cierre (cifrado, sello SHA-256, SQLAlchemy, logging
-y CI)**.
+alertas, descarga del PDF final y exportación CSV)**, **5 (saldo de vacaciones,
+feriados administrables, validaciones de servidor y jefe GTC desde usuarios)** y
+**6 (RNF: cifrado Fernet, sello SHA-256, SQLAlchemy, logging, CI y guía de
+despliegue)**.
 
-Cierre actual de calidad: **83 pruebas pytest** y **52/52** checks del smoke test,
-sin datos de prueba residuales en la base.
+Cierre actual de calidad: **93 pruebas pytest** y **57/57** checks del smoke test,
+sin datos de prueba residuales en la base. El workflow de GitHub Actions compila
+y ejecuta la suite en cada push a `main`.
 
 ---
 
@@ -358,5 +400,6 @@ sin datos de prueba residuales en la base.
 |---|---|
 | «Falta la variable DATABASE_URL» | Crear `.env` a partir de `.env.example` |
 | Error al importar `streamlit_drawable_canvas` | Debe ejecutarse con `streamlit run`, no con `python app.py` |
-| `pandas only supports SQLAlchemy...` | Advertencia conocida; se resuelve en la Fase 6 migrando a SQLAlchemy |
+| `pandas only supports SQLAlchemy...` | Las lecturas deben usar `get_engine()`; ya migradas en Fase 6 |
+| `CifradoError: la FERNET_KEY no coincide` | Se cambió la clave; restaure la original o los datos cifrados no se recuperan |
 | Usuario bloqueado | `estado_vigencia = FALSE` (baja lógica); Gerencia puede reactivarlo desde el panel de vigencia |

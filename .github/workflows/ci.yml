@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Descargar el repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Compilar el código
+        run: python -m compileall -q src tests scripts app.py
+
+      - name: Ejecutar la suite
+        env:
+          # Sin DATABASE_URL, las pruebas de integración se omiten.
+          # tests/conftest.py genera una FERNET_KEY efímera para las unitarias.
+          DATABASE_URL: ""
+        run: python -m pytest

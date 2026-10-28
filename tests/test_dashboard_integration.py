@@ -154,4 +154,5 @@ def test_repositorio_filtros_y_descarga_pdf_final():
     finally:
         if ruta is not None:
             Path(ruta).unlink(missing_ok=True)
+            Path(ruta).with_suffix(".pdf.sha256").unlink(missing_ok=True)
         _eliminar(id_solicitud)

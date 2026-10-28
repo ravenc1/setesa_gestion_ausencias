@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS solicitud (
     firma_empleado   TEXT,
     firma_jefe_gtc   TEXT,
     firma_gerencia   TEXT,
+    pdf_hash         VARCHAR(64),
+    pdf_hash_fecha   TIMESTAMP,
     CONSTRAINT solicitud_estado_workflow_check CHECK (
         estado_workflow IN (
             'Ingresada',

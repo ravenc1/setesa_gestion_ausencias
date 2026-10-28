@@ -3,7 +3,8 @@
 import streamlit as st
 import pandas as pd
 
-from src.core.database import get_connection
+from src.core.database import get_engine
+from src.core.logging_config import obtener_logger
 from src.core.workflow import (
     ESTADO_PENDIENTE_APROBACION_GERENCIA,
     ESTADO_PENDIENTE_FIRMA_COORDINADOR,
@@ -18,29 +19,31 @@ from src.core.solicitudes import (
 from src.services.documentos import generar_pdf_solicitud
 from src.services.utils_firma import canvas_to_base64
 
+logger = obtener_logger("setesa.coordinador")
+
 
 def obtener_solicitudes_pendientes():
     """Recupera las solicitudes que esperan la firma del Coordinador GTC."""
-    conn = get_connection()
-    if conn:
-        try:
-            query = """
-                SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
-                       s.fecha_inicio, s.fecha_fin, s.fecha_creacion
-                FROM solicitud s
-                JOIN usuario u ON s.id_usuario = u.id_usuario
-                WHERE s.estado_workflow = %s
-                ORDER BY s.fecha_creacion ASC
-            """
-            df = pd.read_sql_query(
-                query, conn, params=(ESTADO_PENDIENTE_FIRMA_COORDINADOR,)
-            )
-            conn.close()
-            return df
-        except Exception as e:
-            st.error(f"Error al obtener datos: {e}")
-            return pd.DataFrame()
-    return pd.DataFrame()
+    engine = get_engine()
+    if engine is None:
+        return pd.DataFrame()
+
+    query = """
+        SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
+               s.fecha_inicio, s.fecha_fin, s.fecha_creacion
+        FROM solicitud s
+        JOIN usuario u ON s.id_usuario = u.id_usuario
+        WHERE s.estado_workflow = %s
+        ORDER BY s.fecha_creacion ASC
+    """
+    try:
+        return pd.read_sql_query(
+            query, engine, params=(ESTADO_PENDIENTE_FIRMA_COORDINADOR,)
+        )
+    except Exception as e:
+        logger.exception("Error al obtener las solicitudes pendientes")
+        st.error(f"Error al obtener datos: {e}")
+        return pd.DataFrame()
 
 
 def firmar_aprobacion_banco(id_solicitud, id_usuario, firma_b64):

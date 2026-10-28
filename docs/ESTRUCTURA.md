@@ -4,7 +4,7 @@ Organización por capas (Arquitectura Web de Tres Capas, según el documento del
 proyecto). Los módulos están en sus paquetes, con `import` absolutos,
 credenciales externalizadas y utilidades de prueba.
 
-Estado actual: **Fases 0, 1, 2, 3, 4 y 5 completadas** (ver `docs/CHECKLIST_AVANCE.md`).
+Estado actual: **Fases 0, 1, 2, 3, 4, 5 y 6 completadas** (ver `docs/CHECKLIST_AVANCE.md`).
 
 ## Árbol
 
@@ -14,16 +14,19 @@ proyecto_setesa/
 ├── requirements.txt           # Dependencias
 ├── pytest.ini                 # Configuración de pruebas
 ├── README.md                  # Guía de instalación y uso
-├── .env                       # DATABASE_URL (NO versionar)
+├── .env                       # DATABASE_URL + FERNET_KEY (NO versionar)
 ├── .env.example               # Plantilla de variables de entorno
 ├── .gitignore
+├── .github/workflows/ci.yml   # Compilación + pytest
 │
 ├── src/
 │   ├── __init__.py
 │   ├── core/                  # Núcleo (config, datos, seguridad, dominio)
-│   │   ├── database.py        # Conexión a PostgreSQL (lee .env)
+│   │   ├── database.py        # PostgreSQL: psycopg2 (escrituras) + SQLAlchemy (lecturas)
 │   │   ├── auth.py            # Login con hash + RBAC
 │   │   ├── security.py        # Hashing PBKDF2 + rol_autorizado()
+│   │   ├── crypto.py          # Fernet: cifrado en reposo de datos sensibles
+│   │   ├── logging_config.py  # Logger rotativo en storage/logs
 │   │   ├── workflow.py        # Estados y transiciones permitidas
 │   │   ├── solicitudes.py     # Servicio transaccional + historial
 │   │   ├── vigencia.py        # Baja lógica, auditoría y reactivación
@@ -34,7 +37,7 @@ proyecto_setesa/
 │   │   ├── validaciones.py    # Reglas de fechas y saldo en servidor
 │   │   ├── usuarios.py        # Usuarios por rol (jefe GTC)
 │   │   ├── utils.py           # Lógica pura (calcular_dias_habiles)
-│   │   └── config.py          # Rutas centralizadas (storage/)
+│   │   └── config.py          # Rutas y variables (.env o st.secrets)
 │   ├── features/              # Módulos funcionales por rol
 │   │   ├── registro.py        # Formulario del Consultor (CU-02)
 │   │   ├── coordinador.py     # Panel Coordinador GTC (CU-04)
@@ -51,14 +54,16 @@ proyecto_setesa/
 │   ├── migracion_fase1.py     # Historial + normalización de estados
 │   ├── migracion_fase3.py     # vigencia_log + restricciones
 │   ├── migracion_fase5.py     # saldo de vacaciones + catálogo de feriados
+│   ├── migracion_fase6.py     # sello SHA-256 + cifrado de datos heredados
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a hash
 │
 ├── tests/
-│   ├── conftest.py            # sys.path + carga de .env
+│   ├── conftest.py            # sys.path + .env + FERNET_KEY de pruebas
 │   ├── test_utils.py          # Días hábiles
 │   ├── test_workflow.py       # Catálogo y transiciones
 │   ├── test_security.py       # PBKDF2 y migración
+│   ├── test_crypto.py         # Cifrado Fernet y clave incorrecta
 │   ├── test_utils_firma.py    # Canvas/Base64, nombres únicos y limpieza
 │   ├── test_solicitudes_integration.py  # BD real (skip sin DATABASE_URL)
 │   ├── test_documentos.py     # PDF con 3 firmas + ruta_pdf (BD real)
@@ -74,13 +79,15 @@ proyecto_setesa/
 ├── docs/
 │   ├── ESTRUCTURA.md          # Este archivo
 │   ├── CHECKLIST_AVANCE.md    # Estado y plan por fases
+│   ├── DESPLIEGUE.md          # Producción, secrets y operación
 │   ├── schema.sql             # DDL completo del esquema
 │   └── evidencias/            # Salidas de pruebas y capturas
 │
 ├── assets/                    # Recursos estáticos
 ├── storage/
-│   ├── pdf/                   # PDFs emitidos
+│   ├── pdf/                   # PDFs emitidos + sellos .pdf.sha256
 │   ├── firmas/                # Imágenes temporales de firmas
+│   ├── logs/                  # Logs rotativos (no versionar)
 │   └── backups/               # Respaldos JSON (no versionar)
 └── proyecto_doc/              # Documento del proyecto (PDF)
 ```
@@ -117,6 +124,10 @@ tesis (que exige `Pendiente de Firma Coordinador`).
 
 ## Cómo ejecutar
 
+Antes de arrancar, `.env` debe tener `DATABASE_URL` y `FERNET_KEY` (o definir
+ambas en los secrets de Streamlit). La guía completa está en
+`docs/DESPLIEGUE.md`.
+
 ```powershell
 # Instalar dependencias
 .\venv\Scripts\python.exe -m pip install -r requirements.txt
@@ -127,6 +138,8 @@ tesis (que exige `Pendiente de Firma Coordinador`).
 # Migración de esquema/datos (idempotente)
 .\venv\Scripts\python.exe scripts\migracion_fase1.py
 .\venv\Scripts\python.exe scripts\migracion_fase3.py
+.\venv\Scripts\python.exe scripts\migracion_fase5.py
+.\venv\Scripts\python.exe scripts\migracion_fase6.py --cifrar-existentes
 
 # Vigencia semestral programada (solo si venció el periodo)
 .\venv\Scripts\python.exe scripts\vigencia_semestral.py
@@ -210,6 +223,22 @@ tesis (que exige `Pendiente de Firma Coordinador`).
      formulario replica los mensajes.
    - El jefe GTC se elige desde los usuarios vigentes con rol Coordinador GTC.
    - `scripts/migracion_fase5.py` es idempotente y siembra 2025–2027.
+10. **Fase 6 (RNF y cierre)**:
+    - `src/core/crypto.py` cifra con Fernet la explicación y las tres firmas; el
+      prefijo `fernet:` distingue los datos cifrados de los heredados.
+    - `src/core/database.py` usa psycopg2 para escrituras transaccionales y
+      SQLAlchemy (`get_engine`) para las lecturas con pandas; ya no hay
+      advertencias de DBAPI2.
+    - `src/core/logging_config.py` escribe un log rotativo en
+      `storage/logs/setesa.log` y registra login, workflow, PDF y vigencia.
+    - `src/services/documentos.py` calcula el SHA-256 del PDF, lo persiste en
+      `solicitud.pdf_hash` y deja un sidecar `.pdf.sha256`; el dashboard verifica
+      la integridad.
+    - `scripts/migracion_fase6.py` agrega las columnas, cifra datos heredados con
+      `--cifrar-existentes` y sella PDFs existentes.
+    - `.github/workflows/ci.yml` compila y ejecuta `pytest` en cada push.
+    - `docs/DESPLIEGUE.md` documenta Supabase, Streamlit Cloud, secrets,
+      respaldos y operación.
 
 ## Módulo Consultor
 
@@ -220,10 +249,12 @@ tesis (que exige `Pendiente de Firma Coordinador`).
 
 ## Pendientes conocidos
 
-- **Fase 6 (P1/P2)**: cifrado de datos sensibles, sello SHA-256 del PDF,
-  SQLAlchemy (elimina la advertencia de pandas), logging y CI.
 - **D-02**: rol Contabilidad de solo lectura (diferido; la tesis usa
   Administrador como beneficiario del dashboard).
 - **R-11**: recordatorio al banco (diferido; sin correo institucional).
-- Advertencia de pandas: `pd.read_sql_query` con conexión DBAPI2 (se resuelve
-  en la Fase 6 con SQLAlchemy).
+- **D-06**: rechazo/devolución con motivo (diferido; fuera del alcance acordado).
+- **Transcripción documental**: llevar el estado final de la Fase 6 a las tablas
+  25, 26 y 27 del PDF de la tesis y preparar la defensa.
+
+Los RNF de cifrado, integridad, logging y CI quedaron cerrados en la Fase 6. La
+advertencia de pandas desapareció al migrar las lecturas a SQLAlchemy.

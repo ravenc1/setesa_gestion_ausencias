@@ -3,7 +3,10 @@
 # Importación de módulos lógicos 
 import streamlit as st
 from src.core import auth
+from src.core.logging_config import configurar_logging
 from src.features import registro, dashboard, vigencia, coordinador, feriados
+
+configurar_logging()
 
 st.set_page_config(page_title="SETESA Workflow", page_icon="🏢", layout="wide")
 

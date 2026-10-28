@@ -7,8 +7,10 @@
 
 import pandas as pd
 
-from src.core.database import get_connection
+from src.core.crypto import cifrar, descifrar_campos
+from src.core.database import get_connection, get_engine
 from src.core.feriados import fechas_feriados
+from src.core.logging_config import obtener_logger
 from src.core.utils import calcular_dias_habiles
 from src.core.validaciones import (
     ValidacionError,
@@ -23,6 +25,8 @@ from src.core.workflow import (
     ESTADO_PENDIENTE_FIRMA_COORDINADOR,
     puede_transicionar,
 )
+
+logger = obtener_logger("setesa.solicitudes")
 
 
 class TransicionInvalida(Exception):
@@ -115,6 +119,10 @@ def registrar_solicitud(
         id_usuario, tipo_ausencia, dias_calculados, fecha_inicio
     )
 
+    # H-11: la explicación y la firma se guardan cifradas en reposo.
+    explicacion_cifrada = cifrar(explicacion)
+    firma_cifrada = cifrar(firma_empleado_b64)
+
     conn = get_connection()
     if not conn:
         raise RuntimeError("No hay conexión a la base de datos.")
@@ -141,8 +149,8 @@ def registrar_solicitud(
                         puesto,
                         codigo_empleado,
                         dias_solicitados,
-                        explicacion,
-                        firma_empleado_b64,
+                        explicacion_cifrada,
+                        firma_cifrada,
                     ),
                 )
                 id_solicitud = cursor.fetchone()[0]
@@ -172,6 +180,14 @@ def registrar_solicitud(
                 # H-01: registrar actividad del usuario en la misma transacción.
                 marcar_actividad(cursor, id_usuario)
 
+        logger.info(
+            "Solicitud %s registrada por usuario %s (%s, %s a %s)",
+            id_solicitud,
+            id_usuario,
+            tipo_ausencia,
+            fecha_inicio,
+            fecha_fin,
+        )
         return id_solicitud
     finally:
         conn.close()
@@ -216,13 +232,14 @@ def cambiar_estado(
                     raise FirmaRequerida(estado_nuevo)
 
                 if columna_firma:
+                    firma_cifrada = cifrar(firma_b64)
                     cursor.execute(
                         f"""
                         UPDATE solicitud
                         SET estado_workflow = %s, {columna_firma} = %s
                         WHERE id_solicitud = %s AND estado_workflow = %s
                         """,
-                        (estado_nuevo, firma_b64, id_solicitud, estado_anterior),
+                        (estado_nuevo, firma_cifrada, id_solicitud, estado_anterior),
                     )
                 else:
                     cursor.execute(
@@ -248,6 +265,13 @@ def cambiar_estado(
                 # H-01: firmar/aprobar también cuenta como actividad.
                 marcar_actividad(cursor, id_usuario)
 
+        logger.info(
+            "Solicitud %s: %s -> %s (usuario %s)",
+            id_solicitud,
+            estado_anterior,
+            estado_nuevo,
+            id_usuario,
+        )
         return estado_anterior, estado_nuevo
     finally:
         conn.close()
@@ -273,7 +297,7 @@ def obtener_solicitud(id_solicitud):
             if not fila:
                 return None
             columnas = [descripcion[0] for descripcion in cursor.description]
-            return dict(zip(columnas, fila))
+            return descifrar_campos(dict(zip(columnas, fila)))
     finally:
         conn.close()
 
@@ -289,6 +313,27 @@ def actualizar_ruta_pdf(id_solicitud, ruta_pdf):
                 cursor.execute(
                     "UPDATE solicitud SET ruta_pdf = %s WHERE id_solicitud = %s",
                     (str(ruta_pdf), id_solicitud),
+                )
+                return cursor.rowcount == 1
+    finally:
+        conn.close()
+
+
+def actualizar_hash_pdf(id_solicitud, pdf_hash):
+    """Persiste el sello SHA-256 del PDF oficial (H-13)."""
+    conn = get_connection()
+    if not conn:
+        raise RuntimeError("No hay conexión a la base de datos.")
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE solicitud
+                    SET pdf_hash = %s, pdf_hash_fecha = NOW()
+                    WHERE id_solicitud = %s
+                    """,
+                    (pdf_hash, id_solicitud),
                 )
                 return cursor.rowcount == 1
     finally:
@@ -314,18 +359,15 @@ def obtener_estado(id_solicitud):
 
 def obtener_historial(id_solicitud):
     """Devuelve el historial de estados de una solicitud como DataFrame."""
-    conn = get_connection()
-    if not conn:
+    engine = get_engine()
+    if engine is None:
         return pd.DataFrame()
-    try:
-        query = """
-            SELECT h.fecha, h.estado_anterior, h.estado_nuevo,
-                   u.nombre_completo AS actor, h.observacion
-            FROM solicitud_historial h
-            LEFT JOIN usuario u ON h.id_usuario = u.id_usuario
-            WHERE h.id_solicitud = %s
-            ORDER BY h.fecha ASC, h.id_historial ASC
-        """
-        return pd.read_sql_query(query, conn, params=(id_solicitud,))
-    finally:
-        conn.close()
+    query = """
+        SELECT h.fecha, h.estado_anterior, h.estado_nuevo,
+               u.nombre_completo AS actor, h.observacion
+        FROM solicitud_historial h
+        LEFT JOIN usuario u ON h.id_usuario = u.id_usuario
+        WHERE h.id_solicitud = %s
+        ORDER BY h.fecha ASC, h.id_historial ASC
+    """
+    return pd.read_sql_query(query, engine, params=(id_solicitud,))

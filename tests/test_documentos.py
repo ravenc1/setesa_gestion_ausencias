@@ -24,7 +24,10 @@ from src.core.workflow import (
     ESTADO_FINALIZADA,
     ESTADO_PENDIENTE_APROBACION_GERENCIA,
 )
-from src.services.documentos import generar_pdf_solicitud
+from src.services.documentos import (
+    generar_pdf_solicitud,
+    verificar_integridad_pdf,
+)
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("DATABASE_URL"),
@@ -86,8 +89,13 @@ def _crear_solicitud(id_usuario):
 
 
 def _limpiar(id_solicitud, ruta_pdf=None):
-    if ruta_pdf and Path(ruta_pdf).exists():
-        Path(ruta_pdf).unlink()
+    if ruta_pdf:
+        for archivo in (
+            Path(ruta_pdf),
+            Path(ruta_pdf).with_suffix(".pdf.sha256"),
+        ):
+            if archivo.exists():
+                archivo.unlink()
     conn = get_connection()
     if not conn:
         return
@@ -152,3 +160,59 @@ def test_pdf_sin_aprobaciones_solo_estampa_consultor(ids):
         assert generar_pdf_solicitud(id_solicitud) == ruta
     finally:
         _limpiar(id_solicitud, ruta)
+
+
+def test_pdf_se_sella_y_detecta_alteracion(ids):
+    id_solicitud = _crear_solicitud(ids["Consultor"])
+    ruta = None
+    try:
+        ruta = generar_pdf_solicitud(id_solicitud)
+
+        datos = obtener_solicitud(id_solicitud)
+        assert datos["pdf_hash"] and len(datos["pdf_hash"]) == 64
+        assert datos["pdf_hash_fecha"] is not None
+        assert Path(ruta).with_suffix(".pdf.sha256").exists()
+
+        integridad = verificar_integridad_pdf(id_solicitud)
+        assert integridad["estado"] == "ok"
+        assert integridad["sello_esperado"] == integridad["sello_actual"]
+
+        # Cualquier cambio en el archivo invalida el sello registrado.
+        with open(ruta, "ab") as archivo:
+            archivo.write(b"\n% alterado por la prueba\n")
+
+        integridad = verificar_integridad_pdf(id_solicitud)
+        assert integridad["estado"] == "alterado"
+        assert integridad["sello_esperado"] != integridad["sello_actual"]
+    finally:
+        _limpiar(id_solicitud, ruta)
+
+
+def test_datos_sensibles_se_guardan_cifrados(ids):
+    id_solicitud = _crear_solicitud(ids["Consultor"])
+    try:
+        conn = get_connection()
+        if not conn:
+            pytest.skip("No hay conexión a la base de datos.")
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT explicacion, firma_empleado
+                    FROM solicitud WHERE id_solicitud = %s
+                    """,
+                    (id_solicitud,),
+                )
+                explicacion, firma = cursor.fetchone()
+        finally:
+            conn.close()
+
+        assert explicacion.startswith("fernet:")
+        assert firma.startswith("fernet:")
+
+        # La lectura de la aplicación devuelve el texto original.
+        datos = obtener_solicitud(id_solicitud)
+        assert datos["explicacion"].startswith("PYTEST_PDF_")
+        assert not datos["firma_empleado"].startswith("fernet:")
+    finally:
+        _limpiar(id_solicitud)

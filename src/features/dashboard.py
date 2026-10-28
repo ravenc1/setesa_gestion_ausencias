@@ -5,7 +5,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from src.core.database import get_connection
+from src.core.database import get_engine
+from src.core.logging_config import obtener_logger
 from src.core.reportes import (
     calcular_kpis,
     exportar_csv,
@@ -25,31 +26,37 @@ from src.core.workflow import (
     ESTADO_FINALIZADA,
     ESTADO_PENDIENTE_APROBACION_GERENCIA,
 )
-from src.services.documentos import generar_pdf_solicitud, preparar_pdf_descarga
+from src.services.documentos import (
+    generar_pdf_solicitud,
+    preparar_pdf_descarga,
+    verificar_integridad_pdf,
+)
 from src.services.utils_firma import canvas_to_base64
+
+logger = obtener_logger("setesa.dashboard")
 
 
 def obtener_solicitudes():
     """Recupera todas las solicitudes con el nombre del colaborador."""
-    conn = get_connection()
-    if not conn:
+    engine = get_engine()
+    if engine is None:
         return pd.DataFrame()
 
+    query = """
+        SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
+               s.fecha_inicio, s.fecha_fin, s.dias_solicitados,
+               s.estado_workflow, s.fecha_creacion, s.ruta_pdf,
+               s.pdf_hash
+        FROM solicitud s
+        JOIN usuario u ON s.id_usuario = u.id_usuario
+        ORDER BY s.fecha_creacion DESC
+    """
     try:
-        query = """
-            SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
-                   s.fecha_inicio, s.fecha_fin, s.dias_solicitados,
-                   s.estado_workflow, s.fecha_creacion, s.ruta_pdf
-            FROM solicitud s
-            JOIN usuario u ON s.id_usuario = u.id_usuario
-            ORDER BY s.fecha_creacion DESC
-        """
-        return pd.read_sql_query(query, conn)
+        return pd.read_sql_query(query, engine)
     except Exception as e:
+        logger.exception("Error al obtener las solicitudes del dashboard")
         st.error(f"Error al obtener solicitudes: {e}")
         return pd.DataFrame()
-    finally:
-        conn.close()
 
 
 def _etiqueta_solicitud(df, id_solicitud):
@@ -128,6 +135,7 @@ def _mostrar_descargas(df_filtrado):
             try:
                 ruta, contenido = preparar_pdf_descarga(id_pdf)
             except Exception as e:
+                logger.exception("No se pudo preparar el PDF final %s", id_pdf)
                 st.error(f"No se pudo preparar el PDF final: {e}")
             else:
                 st.download_button(
@@ -137,6 +145,32 @@ def _mostrar_descargas(df_filtrado):
                     mime="application/pdf",
                     type="primary",
                 )
+                integridad = verificar_integridad_pdf(id_pdf)
+                if integridad["estado"] == "ok":
+                    st.success("🔐 Integridad verificada (SHA-256).")
+                elif integridad["estado"] == "alterado":
+                    st.error(
+                        "⚠️ El PDF no coincide con el sello registrado. "
+                        "Regenere el documento antes de usarlo."
+                    )
+                elif integridad["estado"] == "sin_sello":
+                    st.warning(
+                        "El PDF existe pero no tiene sello registrado; "
+                        "regenere el documento para sellarlo."
+                    )
+                else:
+                    st.info("El PDF aún no está disponible en disco.")
+
+                with st.expander("Ver sello SHA-256"):
+                    st.code(
+                        integridad["sello_esperado"] or "Sin sello registrado",
+                        language="text",
+                    )
+                    if integridad["sello_actual"]:
+                        st.caption(
+                            "Sello calculado del archivo actual: "
+                            f"{integridad['sello_actual']}"
+                        )
 
     with col_csv:
         st.caption(

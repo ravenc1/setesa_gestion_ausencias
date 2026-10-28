@@ -57,7 +57,11 @@ from src.core.vigencia import (
 )
 from src.features.registro import registrar_solicitud_firmada, obtener_mis_solicitudes
 from src.features.dashboard import obtener_solicitudes
-from src.services.documentos import generar_pdf_solicitud, preparar_pdf_descarga
+from src.services.documentos import (
+    generar_pdf_solicitud,
+    preparar_pdf_descarga,
+    verificar_integridad_pdf,
+)
 from src.services.motor_pdf import generar_pdf_accion_personal
 
 resultados = []
@@ -74,6 +78,14 @@ def firma_dummy_b64():
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+
+def _limpiar_pdf(ruta):
+    """Elimina el PDF de prueba y su sello sidecar."""
+    if not ruta:
+        return
+    for archivo in (Path(ruta), Path(ruta).with_suffix(".pdf.sha256")):
+        archivo.unlink(missing_ok=True)
 
 
 def test_dias_habiles():
@@ -271,17 +283,17 @@ def test_pdf():
     except Exception as e:
         check("generación de PDF", False, f"-> {e}")
     finally:
-        if ruta and Path(ruta).exists():
-            Path(ruta).unlink()
+        _limpiar_pdf(ruta)
 
 
 def test_consultor_flujo():
-    """Registro del consultor -> historial -> PDF, con limpieza posterior."""
+    """Registro del consultor -> historial -> PDF -> cifrado e integridad."""
     conn = get_connection()
     if not conn:
         check("consultor: registro e historial", False, "-> sin conexión")
         return
     marca = f"TEST_CONSULTOR_{uuid4().hex[:8]}"
+    id_solicitud = None
     pdf_generado = []
     try:
         cursor = conn.cursor()
@@ -306,6 +318,8 @@ def test_consultor_flujo():
             5, marca, firma_dummy_b64(),
         )
         check("consultor: registrar_solicitud_firmada", id_solicitud is not None)
+        if not id_solicitud:
+            return
 
         df = obtener_mis_solicitudes(id_usuario)
         presente = (not df.empty) and bool((df["explicacion"] == marca).any())
@@ -317,21 +331,64 @@ def test_consultor_flujo():
                 "consultor: estado Pendiente de Firma Coordinador",
                 fila["estado_workflow"] == ESTADO_PENDIENTE_FIRMA_COORDINADOR,
             )
+
+            # H-11: los datos sensibles deben estar cifrados en reposo.
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT explicacion, firma_empleado
+                FROM solicitud WHERE id_solicitud = %s
+                """,
+                (id_solicitud,),
+            )
+            crudo = cursor.fetchone()
+            cursor.close()
+            check(
+                "seguridad: explicación y firma cifradas en reposo",
+                bool(crudo)
+                and str(crudo[0]).startswith("fernet:")
+                and str(crudo[1]).startswith("fernet:"),
+            )
+
+            datos = obtener_solicitud(id_solicitud)
+            check(
+                "seguridad: la aplicación descifra al leer",
+                datos["explicacion"] == marca
+                and not str(datos["firma_empleado"]).startswith("fernet:"),
+            )
+
             ruta = generar_pdf_solicitud(id_solicitud)
             check("consultor: PDF del expediente", Path(ruta).exists(), f"-> {ruta}")
+            pdf_generado.append(ruta)
+
             datos = obtener_solicitud(id_solicitud)
             check("consultor: ruta_pdf persistida", datos["ruta_pdf"] == ruta)
-            pdf_generado.append(ruta)
+            check(
+                "integridad: sello SHA-256 persistido",
+                bool(datos["pdf_hash"]) and len(datos["pdf_hash"]) == 64,
+            )
+            integridad = verificar_integridad_pdf(id_solicitud)
+            check("integridad: PDF coincide con el sello",
+                  integridad["estado"] == "ok")
+
+            with open(ruta, "ab") as archivo:
+                archivo.write(b"\n% alterado por el smoke test\n")
+            integridad = verificar_integridad_pdf(id_solicitud)
+            check("integridad: alteración detectada",
+                  integridad["estado"] == "alterado")
     except Exception as e:
         check("consultor: registro e historial", False, f"-> {e}")
     finally:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM solicitud WHERE explicacion = %s", (marca,))
+        if id_solicitud:
+            cursor.execute(
+                "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
+            )
         conn.commit()
         cursor.close()
         conn.close()
         for ruta in pdf_generado:
-            Path(ruta).unlink(missing_ok=True)
+            _limpiar_pdf(ruta)
         print("   (datos de prueba del consultor eliminados)")
 
 
@@ -402,8 +459,7 @@ def test_dashboard_gerencia():
     except Exception as e:
         check("dashboard: repositorio y descarga", False, f"-> {e}")
     finally:
-        if ruta_pdf:
-            Path(ruta_pdf).unlink(missing_ok=True)
+        _limpiar_pdf(ruta_pdf)
         if id_solicitud:
             cursor = conn.cursor()
             cursor.execute(
@@ -547,11 +603,6 @@ def test_vacaciones_feriados():
             cursor.execute(
                 "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
             )
-        cursor.execute(
-            "DELETE FROM solicitud WHERE explicacion LIKE 'TEST_VACACIONES_%' "
-            "OR explicacion LIKE 'TEST_EXCESO_%' "
-            "OR explicacion LIKE 'TEST_FECHAS_%'"
-        )
         conn.commit()
         cursor.close()
         conn.close()
