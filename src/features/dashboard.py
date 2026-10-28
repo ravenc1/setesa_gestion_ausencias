@@ -1,14 +1,17 @@
-# Trazabilidad de solicitudes y filtrado.
+# Trazabilidad, filtros y descargas del panel gerencial (RF-04 / HU-03).
 
-import streamlit as st
+from pathlib import Path
+
 import pandas as pd
+import streamlit as st
 
 from src.core.database import get_connection
-from src.core.workflow import (
-    ESTADOS_WORKFLOW,
-    ESTADO_FINALIZADA,
-    ESTADO_PENDIENTE_APROBACION_GERENCIA,
-    ESTADO_PENDIENTE_FIRMA_COORDINADOR,
+from src.core.reportes import (
+    calcular_kpis,
+    exportar_csv,
+    filtrar_solicitudes,
+    nombre_archivo_csv,
+    resumen_por_tipo,
 )
 from src.core.security import rol_autorizado
 from src.core.solicitudes import (
@@ -17,29 +20,134 @@ from src.core.solicitudes import (
     cambiar_estado,
     obtener_historial,
 )
-from src.services.documentos import generar_pdf_solicitud
+from src.core.workflow import (
+    ESTADOS_WORKFLOW,
+    ESTADO_FINALIZADA,
+    ESTADO_PENDIENTE_APROBACION_GERENCIA,
+)
+from src.services.documentos import generar_pdf_solicitud, preparar_pdf_descarga
 from src.services.utils_firma import canvas_to_base64
 
 
 def obtener_solicitudes():
-    """Recupera todas las solicitudes con un JOIN a la tabla de usuarios."""
+    """Recupera todas las solicitudes con el nombre del colaborador."""
     conn = get_connection()
-    if conn:
-        try:
-            query = """
-                SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
-                       s.fecha_inicio, s.fecha_fin, s.estado_workflow, s.fecha_creacion
-                FROM solicitud s
-                JOIN usuario u ON s.id_usuario = u.id_usuario
-                ORDER BY s.fecha_creacion DESC
-            """
-            df = pd.read_sql_query(query, conn)
-            conn.close()
-            return df
-        except Exception as e:
-            st.error(f"Error al obtener solicitudes: {e}")
-            return pd.DataFrame()
-    return pd.DataFrame()
+    if not conn:
+        return pd.DataFrame()
+
+    try:
+        query = """
+            SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
+                   s.fecha_inicio, s.fecha_fin, s.dias_solicitados,
+                   s.estado_workflow, s.fecha_creacion, s.ruta_pdf
+            FROM solicitud s
+            JOIN usuario u ON s.id_usuario = u.id_usuario
+            ORDER BY s.fecha_creacion DESC
+        """
+        return pd.read_sql_query(query, conn)
+    except Exception as e:
+        st.error(f"Error al obtener solicitudes: {e}")
+        return pd.DataFrame()
+    finally:
+        conn.close()
+
+
+def _etiqueta_solicitud(df, id_solicitud):
+    fila = df.loc[df["id_solicitud"] == id_solicitud].iloc[0]
+    return f"#{id_solicitud} · {fila['nombre_completo']} · {fila['tipo_ausencia']}"
+
+
+def _mostrar_alertas(kpis):
+    pendientes = []
+    if kpis["pendientes_coordinador"]:
+        pendientes.append(
+            f"{kpis['pendientes_coordinador']} pendiente(s) de firma del "
+            "Coordinador GTC"
+        )
+    if kpis["pendientes_gerencia"]:
+        pendientes.append(
+            f"{kpis['pendientes_gerencia']} pendiente(s) de aprobación de "
+            "Gerencia"
+        )
+
+    if pendientes:
+        st.warning("🔔 " + "; ".join(pendientes) + ".")
+    else:
+        st.success("No hay expedientes pendientes de firma en este momento.")
+
+
+def _mostrar_kpis(kpis):
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Total de Expedientes", kpis["total"])
+    col2.metric("Ingresadas", kpis["ingresadas"])
+    col3.metric("Pendientes Coordinador", kpis["pendientes_coordinador"])
+    col4.metric("Pendientes Gerencia", kpis["pendientes_gerencia"])
+    col5.metric("Finalizadas", kpis["finalizadas"])
+
+
+def _mostrar_tabla(df_filtrado):
+    if df_filtrado.empty:
+        st.info("No hay expedientes que coincidan con los filtros seleccionados.")
+        return
+
+    col_pagina, col_tamano = st.columns(2)
+    with col_tamano:
+        tam_pagina = st.selectbox("Filas por página", [10, 25, 50, 100], index=0)
+    paginas = max(1, (len(df_filtrado) + tam_pagina - 1) // tam_pagina)
+    with col_pagina:
+        pagina = st.selectbox("Página", list(range(1, paginas + 1)))
+
+    inicio = (pagina - 1) * tam_pagina
+    vista = df_filtrado.iloc[inicio : inicio + tam_pagina].drop(
+        columns=["ruta_pdf"], errors="ignore"
+    )
+    st.dataframe(vista, width="stretch", hide_index=True)
+    st.caption(
+        f"Mostrando {len(vista)} de {len(df_filtrado)} expedientes filtrados."
+    )
+
+
+def _mostrar_descargas(df_filtrado):
+    st.write("---")
+    st.markdown("#### 📥 Descarga del expediente final (HU-03)")
+
+    col_pdf, col_csv = st.columns(2)
+
+    with col_pdf:
+        finalizadas = df_filtrado[
+            df_filtrado["estado_workflow"] == ESTADO_FINALIZADA
+        ]
+        if finalizadas.empty:
+            st.info("No hay expedientes finalizados en la selección actual.")
+        else:
+            id_pdf = st.selectbox(
+                "Expediente finalizado:",
+                finalizadas["id_solicitud"].tolist(),
+                format_func=lambda valor: _etiqueta_solicitud(finalizadas, valor),
+            )
+            try:
+                ruta, contenido = preparar_pdf_descarga(id_pdf)
+            except Exception as e:
+                st.error(f"No se pudo preparar el PDF final: {e}")
+            else:
+                st.download_button(
+                    "📥 Descargar PDF final con firmas",
+                    data=contenido,
+                    file_name=Path(ruta).name,
+                    mime="application/pdf",
+                    type="primary",
+                )
+
+    with col_csv:
+        st.caption(
+            "El CSV respeta los filtros aplicados y es compatible con Excel."
+        )
+        st.download_button(
+            "📤 Exportar resultados (CSV)",
+            data=exportar_csv(df_filtrado),
+            file_name=nombre_archivo_csv(),
+            mime="text/csv",
+        )
 
 
 def mostrar_dashboard():
@@ -51,7 +159,10 @@ def mostrar_dashboard():
     flash = st.session_state.pop("flash_gerencia", None)
     if flash:
         getattr(st, flash[0])(flash[1])
-    st.info("Módulo de trazabilidad y gobernanza sobre las incidencias del personal externo.")
+    st.info(
+        "Módulo de trazabilidad y gobernanza sobre las incidencias del personal "
+        "externo."
+    )
 
     df_solicitudes = obtener_solicitudes()
 
@@ -69,65 +180,88 @@ def mostrar_dashboard():
         )
         st.dataframe(invalidos, hide_index=True, width="stretch")
 
-    # 1. Indicadores Clave (KPIs)
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Total de Expedientes", len(df_solicitudes))
-    col2.metric(
-        "Pendientes Coordinador",
-        len(
-            df_solicitudes[
-                df_solicitudes["estado_workflow"]
-                == ESTADO_PENDIENTE_FIRMA_COORDINADOR
-            ]
-        ),
-    )
-    col3.metric(
-        "Pendientes Gerencia",
-        len(
-            df_solicitudes[
-                df_solicitudes["estado_workflow"]
-                == ESTADO_PENDIENTE_APROBACION_GERENCIA
-            ]
-        ),
-    )
-    col4.metric(
-        "Finalizadas",
-        len(df_solicitudes[df_solicitudes["estado_workflow"] == ESTADO_FINALIZADA]),
-    )
+    kpis = calcular_kpis(df_solicitudes)
+    _mostrar_alertas(kpis)
+    _mostrar_kpis(kpis)
 
     st.write("---")
-    st.markdown("#### Repositorio Histórico y Filtros")
+    st.markdown("#### 🔎 Repositorio Histórico y Filtros")
 
-    # 2. Filtros de Búsqueda
-    f_col1, f_col2 = st.columns(2)
+    f_col1, f_col2, f_col3 = st.columns(3)
     with f_col1:
         filtro_nombre = st.text_input("🔍 Buscar por nombre de colaborador")
     with f_col2:
-        estados_disponibles = ["Todos"] + ESTADOS_WORKFLOW
-        filtro_estado = st.selectbox("📌 Filtrar por Estado del Workflow", estados_disponibles)
+        filtro_estado = st.selectbox(
+            "📌 Estado del workflow", ["Todos"] + ESTADOS_WORKFLOW
+        )
+    with f_col3:
+        tipos = ["Todos"] + sorted(
+            df_solicitudes["tipo_ausencia"]
+            .dropna()
+            .astype(str)
+            .unique()
+            .tolist()
+        )
+        filtro_tipo = st.selectbox("🏷️ Tipo de incidencia", tipos)
 
-    # Aplicar filtros al dataframe
-    df_filtrado = df_solicitudes.copy()
-    if filtro_nombre:
-        df_filtrado = df_filtrado[
-            df_filtrado["nombre_completo"].str.contains(
-                filtro_nombre, case=False, na=False
-            )
-        ]
-    if filtro_estado != "Todos":
-        df_filtrado = df_filtrado[df_filtrado["estado_workflow"] == filtro_estado]
+    f_col4, f_col5 = st.columns(2)
+    with f_col4:
+        fecha_desde = st.date_input(
+            "📅 Desde (periodo de ausencia)", value=None
+        )
+    with f_col5:
+        fecha_hasta = st.date_input(
+            "📅 Hasta (periodo de ausencia)", value=None
+        )
 
-    # Mostrar la tabla de datos
-    st.dataframe(df_filtrado, width="stretch", hide_index=True)
+    try:
+        df_filtrado = filtrar_solicitudes(
+            df_solicitudes,
+            nombre=filtro_nombre,
+            estado=filtro_estado,
+            tipo=filtro_tipo,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+        )
+    except ValueError as e:
+        st.error(str(e))
+        df_filtrado = df_solicitudes.iloc[0:0]
+
+    st.caption(
+        f"Mostrando **{len(df_filtrado)}** de **{len(df_solicitudes)}** "
+        "expedientes."
+    )
+
+    if not df_filtrado.empty:
+        with st.expander("📊 Distribución de los resultados filtrados"):
+            col_estado, col_tipo = st.columns(2)
+            with col_estado:
+                st.write("**Por estado**")
+                por_estado = (
+                    df_filtrado["estado_workflow"]
+                    .value_counts()
+                    .rename_axis("estado_workflow")
+                    .reset_index(name="cantidad")
+                )
+                st.dataframe(por_estado, hide_index=True, width="stretch")
+            with col_tipo:
+                st.write("**Por tipo de incidencia**")
+                st.dataframe(
+                    resumen_por_tipo(df_filtrado),
+                    hide_index=True,
+                    width="stretch",
+                )
+
+    _mostrar_tabla(df_filtrado)
+    _mostrar_descargas(df_filtrado)
 
     if df_filtrado.empty:
-        st.info("No hay expedientes que coincidan con los filtros seleccionados.")
         return
 
     st.write("---")
     st.markdown("#### Gestión de Workflow (Autorización de Gerencia)")
 
-    # 3. Solo se permite la transición que corresponde a Gerencia.
+    # Solo se permite la transición que corresponde a Gerencia.
     id_seleccionado = st.selectbox(
         "ID de la Solicitud", df_filtrado["id_solicitud"].tolist()
     )

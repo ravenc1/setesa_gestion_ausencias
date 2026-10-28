@@ -41,15 +41,16 @@ proyecto_setesa/
 │   │   ├── solicitudes.py     # Servicio transaccional + historial
 │   │   ├── vigencia.py        # Baja lógica, auditoría y reactivación
 │   │   ├── catalogos.py       # Tipos de ausencia
+│   │   ├── reportes.py        # Filtros, KPIs y exportación CSV
 │   │   ├── utils.py           # Días hábiles
 │   │   └── config.py          # Rutas de storage
 │   ├── features/
 │   │   ├── registro.py        # Panel del Consultor
 │   │   ├── coordinador.py     # Portal de aprobaciones GTC
-│   │   ├── dashboard.py       # Panel gerencial
+│   │   ├── dashboard.py       # Panel gerencial + filtros + descargas
 │   │   └── vigencia.py        # Panel de auditoría y baja semestral
 │   └── services/
-│       ├── documentos.py      # PDF desde la BD + ruta_pdf
+│       ├── documentos.py      # PDF desde la BD + ruta_pdf + descarga
 │       ├── motor_pdf.py       # Generación del PDF oficial
 │       └── utils_firma.py     # Canvas <-> Base64 <-> PNG
 ├── scripts/
@@ -66,6 +67,8 @@ proyecto_setesa/
 │   ├── test_solicitudes_integration.py
 │   ├── test_documentos.py
 │   ├── test_vigencia.py
+│   ├── test_reportes.py       # Filtros, KPIs y CSV
+│   ├── test_dashboard_integration.py  # Repositorio + PDF final
 │   ├── test_app_smoke.py
 │   └── smoke_test.py          # Prueba E2E manual
 ├── docs/
@@ -200,6 +203,25 @@ Reglas:
 
 ---
 
+## Dashboard gerencial (RF-04 / HU-03)
+
+- Filtros combinables por **nombre**, **estado**, **tipo de incidencia** y
+  **rango de fechas** (se conservan las solicitudes cuyo periodo de ausencia se
+  solapa con el rango elegido).
+- KPIs: total, ingresadas, pendientes de coordinador, pendientes de gerencia y
+  finalizadas; distribución por estado y por tipo.
+- Alertas in-app con el número de expedientes pendientes de firma.
+- Tabla paginada (10/25/50/100 filas por página).
+- **Descarga del PDF final** con las tres firmas (HU-03); si el archivo no
+  existe, se regenera desde la base.
+- **Exportación CSV** del resultado filtrado, con BOM UTF-8 para abrirlo
+  directamente en Excel.
+
+La lógica de filtros, KPIs y exportación vive en `src/core/reportes.py`, sin
+dependencias de Streamlit, y está cubierta por pruebas unitarias.
+
+---
+
 ## Vigencia semestral (RF-05 / CU-06)
 
 - Un usuario **activo** con más de 6 meses sin actividad pasa a baja lógica
@@ -237,6 +259,10 @@ Reglas:
   que `ruta_pdf` quede persistida.
 - `tests/test_vigencia.py` cubre baja lógica, salvaguarda de administradores,
   auditoría, reactivación y login bloqueado con fechas controladas.
+- `tests/test_reportes.py` cubre los filtros (nombre, estado, tipo y rango de
+  fechas), los KPIs y la exportación CSV.
+- `tests/test_dashboard_integration.py` verifica el repositorio, los filtros
+  sobre datos reales y la descarga del PDF final con tres firmas.
 - `tests/test_app_smoke.py` incluye el rechazo de login de un usuario inactivo
   (QA-01).
 - `tests/test_utils_firma.py` verifica nombres temporales únicos y limpieza.
@@ -274,9 +300,14 @@ El avance detallado, las brechas y el plan por fases están en
 **[`docs/CHECKLIST_AVANCE.md`](docs/CHECKLIST_AVANCE.md)**.
 
 Fases completadas: **0 (línea base)**, **1 (coherencia del workflow)**,
-**2 (firmas completas)** y **3 (vigencia robusta: baja lógica auditable,
-ejecución semestral y reactivación)**.
-Siguiente: **Fase 4 — dashboard completo (filtros, KPIs, descarga y exportación)**.
+**2 (firmas completas)**, **3 (vigencia robusta: baja lógica auditable,
+ejecución semestral y reactivación)** y **4 (dashboard completo: filtros, KPIs,
+alertas, descarga del PDF final y exportación CSV)**.
+Siguiente: **Fase 5 — RF-01 y validaciones de negocio (saldo de vacaciones,
+fechas, feriados y jefe GTC)**.
+
+Cierre actual de calidad: **64 pruebas pytest** y **43/43** checks del smoke test,
+sin datos de prueba residuales en la base.
 
 ---
 

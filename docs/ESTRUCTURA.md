@@ -4,7 +4,7 @@ Organización por capas (Arquitectura Web de Tres Capas, según el documento del
 proyecto). Los módulos están en sus paquetes, con `import` absolutos,
 credenciales externalizadas y utilidades de prueba.
 
-Estado actual: **Fases 0, 1, 2 y 3 completadas** (ver `docs/CHECKLIST_AVANCE.md`).
+Estado actual: **Fases 0, 1, 2, 3 y 4 completadas** (ver `docs/CHECKLIST_AVANCE.md`).
 
 ## Árbol
 
@@ -28,15 +28,16 @@ proyecto_setesa/
 │   │   ├── solicitudes.py     # Servicio transaccional + historial
 │   │   ├── vigencia.py        # Baja lógica, auditoría y reactivación
 │   │   ├── catalogos.py       # Catálogo de tipos de ausencia
+│   │   ├── reportes.py        # Filtros, KPIs y exportación CSV (RF-04)
 │   │   ├── utils.py           # Lógica pura (calcular_dias_habiles)
 │   │   └── config.py          # Rutas centralizadas (storage/)
 │   ├── features/              # Módulos funcionales por rol
 │   │   ├── registro.py        # Formulario del Consultor (CU-02)
 │   │   ├── coordinador.py     # Panel Coordinador GTC (CU-04)
-│   │   ├── dashboard.py       # Panel gerencial (CU-05)
+│   │   ├── dashboard.py       # Panel gerencial + filtros + descargas (CU-05)
 │   │   └── vigencia.py        # Baja lógica semestral (CU-06)
 │   └── services/              # Servicios de soporte
-│       ├── documentos.py      # PDF oficial desde la BD + ruta_pdf
+│       ├── documentos.py      # PDF oficial desde la BD + ruta_pdf + descarga
 │       ├── motor_pdf.py       # Generación de PDF (RF-03)
 │       └── utils_firma.py     # Firma canvas <-> Base64 (RF-06)
 │
@@ -56,6 +57,8 @@ proyecto_setesa/
 │   ├── test_solicitudes_integration.py  # BD real (skip sin DATABASE_URL)
 │   ├── test_documentos.py     # PDF con 3 firmas + ruta_pdf (BD real)
 │   ├── test_vigencia.py       # Baja lógica, auditoría y reactivación (BD real)
+│   ├── test_reportes.py       # Filtros, KPIs y CSV del dashboard (unitarias)
+│   ├── test_dashboard_integration.py  # Repositorio + PDF final (BD real)
 │   ├── test_app_smoke.py      # Renderizado con AppTest + login inactivo
 │   └── smoke_test.py          # Prueba E2E manual (rollback/limpieza)
 │
@@ -145,7 +148,7 @@ tesis (que exige `Pendiente de Firma Coordinador`).
    `auth.py` valida con `security.verify_or_upgrade` y auto-migra al iniciar sesión.
    Se agregó RBAC por módulo (`rol_autorizado`).
 4. **Fase 0 (línea base)**: `docs/schema.sql`, `README.md`, `pytest.ini`,
-   34 pruebas automatizadas iniciales y respaldo JSON (hoy 50).
+   34 pruebas automatizadas iniciales y respaldo JSON (hoy 64).
 5. **Fase 1 (coherencia del workflow)**:
    - `src/core/solicitudes.py` centraliza registro y cambios de estado.
    - `solicitud_historial` audita cada transición.
@@ -177,6 +180,15 @@ tesis (que exige `Pendiente de Firma Coordinador`).
      `scripts/vigencia_semestral.py` permite programarla fuera de la app.
    - `app.py` revalida la vigencia en cada rerun y expulsa sesiones dadas de baja.
    - El panel de Gerencia muestra candidatos, ejecución, reactivación e historial.
+8. **Fase 4 (dashboard completo)**:
+   - `src/core/reportes.py` concentra la lógica pura del panel: filtros por
+     nombre, estado, tipo y rango de fechas (por solapamiento con el periodo de
+     ausencia), KPIs, distribución por tipo y exportación CSV con BOM.
+   - `dashboard.py` muestra alertas de pendientes, cinco KPIs, distribución por
+     estado/tipo, tabla paginada y descarga del PDF final (HU-03).
+   - `services/documentos.py::preparar_pdf_descarga` reutiliza `solicitud.ruta_pdf`
+     o regenera el PDF si el archivo no existe.
+   - Exportación CSV compatible con Excel (no requiere `openpyxl`).
 
 ## Módulo Consultor
 
@@ -187,11 +199,11 @@ tesis (que exige `Pendiente de Firma Coordinador`).
 
 ## Pendientes conocidos
 
-- **Fase 4 (P1)**: filtros por fecha y tipo, descarga del PDF final desde el
-  dashboard, exportación, alertas y rol Contabilidad.
-- **Fase 5 (P1)**: saldo de días de vacaciones (RF-01), validación de fechas y
-  feriados.
+- **Fase 5 (P1)**: saldo de días de vacaciones (RF-01), validación de fechas,
+  feriados de Guatemala y jefe GTC desde usuarios.
 - **Fase 6 (P1/P2)**: cifrado de datos sensibles, sello SHA-256 del PDF,
   SQLAlchemy (elimina la advertencia de pandas) y logging.
+- **D-02**: rol Contabilidad de solo lectura (diferido; la tesis usa
+  Administrador como beneficiario del dashboard).
 - Advertencia de pandas: `pd.read_sql_query` con conexión DBAPI2 (se resuelve
   en la Fase 6 con SQLAlchemy).

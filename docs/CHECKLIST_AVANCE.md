@@ -14,10 +14,12 @@
 
 El proyecto tiene una **base sólida y funcional**: los 7 módulos existen, el
 flujo Consultor → Coordinador → Gerencia → PDF se ejecuta de extremo a extremo y
-la prueba E2E actual pasa **38/38**. La arquitectura de tres capas está
+la prueba E2E actual pasa **43/43**. La arquitectura de tres capas está
 respetada, la seguridad de contraseñas (PBKDF2) está resuelta y, tras las fases
-0–3, el workflow es trazable, las **tres firmas** se capturan y se estampan, y
-la **vigencia semestral** es automática, auditable y reversible.
+0–4, el workflow es trazable, las **tres firmas** se capturan y se estampan, la
+**vigencia semestral** es automática, auditable y reversible, y el **dashboard**
+permite filtrar por nombre, fecha y tipo, ver KPIs, descargar el PDF final y
+exportar los resultados.
 
 La inspección inicial encontró brechas de coherencia entre lo que la tesis
 declara y lo que el sistema realmente hace. **Todos los defectos P0 están
@@ -30,12 +32,11 @@ cerrados:**
 3. ~~Las firmas de Coordinador y Gerencia no se capturaban~~ **Resuelto Fase 2**
    (PR-06 cerrado).
 
-Quedan brechas **P1/P2** ya planificadas: dashboard completo (filtros, KPIs,
-descarga y exportación), saldo de vacaciones, feriados, cifrado en reposo y sello
-de integridad del PDF.
+Quedan brechas **P1/P2** ya planificadas: saldo de vacaciones, feriados,
+cifrado en reposo y sello de integridad del PDF.
 
-**Conclusión:** el sistema está ~90 % funcional y ~88 % de cumplimiento
-verificable contra la tesis. Con las fases 4 a 6 (aprox. 4.5 días de trabajo) se
+**Conclusión:** el sistema está ~95 % funcional y ~92 % de cumplimiento
+verificable contra la tesis. Con las fases 5 y 6 (aprox. 2.5 días de trabajo) se
 puede cerrar al 100 % con evidencia de QA.
 
 ### Registro de avance
@@ -46,16 +47,18 @@ puede cerrar al 100 % con evidencia de QA.
 | 27/10/2026 | **Fase 1** | `solicitud_historial`, transiciones centralizadas, decisión D-01 (opción C), `CHECK` + índices, estado legado migrado y dashboard sin saltos. |
 | 27/10/2026 | **Fase 2** | Canvas y firma obligatoria de Coordinador y Gerencia, PDF con 3 firmas, `ruta_pdf`, nombres únicos y limpieza de temporales. **PR-06 cerrado.** |
 | 27/10/2026 | **Fase 3** | `ultima_actividad` en login/acciones, `vigencia_log`, protección de Administrador, ejecución automática semestral, reactivación e invalidación de sesiones. **H-01/H-06 cerrados; QA-01/QA-06/PR-05 completos.** |
+| 27/10/2026 | **Fase 4** | Filtros por nombre, estado, tipo y rango de fechas; KPIs completos; alertas; paginación; descarga del PDF final y exportación CSV. **H-08/H-09, D-10/D-11/D-13 cerrados.** |
 
 **Evidencias:** `docs/evidencias/2026-10-27_fase0-1.md`,
-`docs/evidencias/2026-10-27_fase2.md` y
-`docs/evidencias/2026-10-27_fase3.md`.
-**Pruebas al cierre:** `pytest` 50/50 y smoke test 38/38, sin datos de prueba
+`docs/evidencias/2026-10-27_fase2.md`,
+`docs/evidencias/2026-10-27_fase3.md` y
+`docs/evidencias/2026-10-27_fase4.md`.
+**Pruebas al cierre:** `pytest` 64/64 y smoke test 43/43, sin datos de prueba
 residuales en la base.
 
-**Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-10, H-12, H-14,
-H-15 y D-01.
-**Hallazgos que siguen abiertos:** H-07…H-09, H-11 y H-13 (Fases 4–6).
+**Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-08, H-09, H-10,
+H-12, H-14, H-15 y D-01.
+**Hallazgos que siguen abiertos:** H-07, H-11 y H-13 (Fases 5–6).
 
 ---
 
@@ -111,15 +114,16 @@ H-15 y D-01.
 | Lectura completa de la tesis (211 pp.) | Requerimientos, diseño, criterios y pruebas extraídos |
 | Inspección de los 12 archivos `.py` | 7 módulos + núcleo + pruebas |
 | Consulta al esquema real en Supabase | 3 tablas (`rol`, `usuario`, `solicitud`), 5 usuarios, 2 solicitudes |
-| `python tests/smoke_test.py` | **14/14 OK** en la línea base (hoy 38/38) |
+| `python tests/smoke_test.py` | **14/14 OK** en la línea base (hoy 43/43) |
 | Búsqueda de actualizaciones de `ultima_actividad` | **0 ocurrencias** de `UPDATE` |
 | Búsqueda de escritura de `firma_jefe_gtc` / `firma_gerencia` | **0 ocurrencias** de escritura |
 | Búsqueda de escritura de `ruta_pdf` | **0 ocurrencias** de escritura |
 | Catálogo de estados vs. datos reales | 1 registro con estado fuera de catálogo |
 
-**Línea base de calidad:** el smoke test valida el camino feliz, pero **no**
-prueba RBAC negativo entre roles, ni filtros del dashboard. La vigencia y el
-login inactivo ya cuentan con pruebas específicas (Fase 3).
+**Línea base de calidad:** el smoke test valida el camino feliz y, tras la
+Fase 4, también los filtros combinados, la exportación CSV y la descarga del PDF
+final. **Falta** prueba RBAC negativa entre roles. La vigencia y el login
+inactivo cuentan con pruebas específicas (Fase 3).
 
 ---
 
@@ -141,7 +145,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | N-07 | RBAC por módulo | ✅ | `rol_autorizado()` + revalidación de vigencia en cada rerun (`app.py`) | — |
 | N-08 | **Esquema SQL versionado** | ✅ | `docs/schema.sql` validado en esquema temporal | — |
 | N-09 | README de instalación/ejecución | ✅ | `README.md` | — |
-| N-10 | Pruebas automatizadas (pytest) | ✅ | 50 pruebas (unitarias, integración, PDF, vigencia y AppTest) | — |
+| N-10 | Pruebas automatizadas (pytest) | ✅ | 64 pruebas (unitarias, integración, PDF, vigencia, reportes y AppTest) | — |
 | N-11 | Advertencia `pd.read_sql_query` | 🔧 | Pandas exige SQLAlchemy | H-31 |
 | N-12 | Limpieza de firmas temporales | ✅ | `utils_firma.eliminar_archivo` + `finally` en el motor; verificado por `test_documentos` | — |
 | N-13 | Logging de errores | 🔴 | Se usa `st.error()` dentro de la capa de datos | H-32 |
@@ -210,19 +214,20 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 
 | # | Ítem | Estado | Detalle |
 |---|---|---|---|
-| D-01 | KPIs básicos | 🟡 | Total, Ingresadas, Finalizadas (faltan pendientes y por tipo) |
-| D-02 | Filtro por nombre | ✅ | `str.contains` |
-| D-03 | Filtro por estado | ✅ | Selector dinámico |
-| D-04 | **Filtro por fecha (rango)** | 🔴 | **RF-04** lo exige |
-| D-05 | **Filtro por tipo de incidencia** | 🔴 | **RF-04** lo exige |
-| D-06 | **Descarga del PDF final** | 🔴 | **HU-03** lo exige; hoy no hay botón |
+| D-01 | KPIs completos | ✅ | Total, Ingresadas, Pendientes Coordinador, Pendientes Gerencia y Finalizadas (`calcular_kpis`) |
+| D-02 | Filtro por nombre | ✅ | `str.contains` sin distinguir mayúsculas (`filtrar_solicitudes`) |
+| D-03 | Filtro por estado | ✅ | Selector dinámico sobre `ESTADOS_WORKFLOW` |
+| D-04 | **Filtro por fecha (rango)** | ✅ | **RF-04** cumplido: solapamiento con `[fecha_inicio, fecha_fin]` |
+| D-05 | **Filtro por tipo de incidencia** | ✅ | **RF-04** cumplido: selector construido desde la base |
+| D-06 | **Descarga del PDF final** | ✅ | **HU-03** cumplido: `preparar_pdf_descarga` reutiliza `ruta_pdf` o regenera |
 | D-07 | **Canvas de firma de gerencia** | ✅ | `st_canvas` obligatorio antes de finalizar |
 | D-08 | **Persistir `firma_gerencia`** | ✅ | `cambiar_estado(..., firma_b64=...)` en la misma transacción |
 | D-09 | Transiciones válidas (no saltos) | ✅ | Solo `Pendiente de Aprobación Gerencia` → `Finalizada` desde Gerencia | — |
-| D-10 | Exportar métricas (CSV/Excel) | 🔴 | La tesis lo menciona como mejora en curso |
-| D-11 | Alertas de pendientes | 🔴 | “Gerencia recibe alerta” (4.12.3) |
+| D-10 | Exportar métricas (CSV/Excel) | ✅ | CSV UTF-8 con BOM, compatible con Excel (`exportar_csv`) |
+| D-11 | Alertas de pendientes | ✅ | Aviso in-app con conteo de coordinador y gerencia (4.12.3) |
 | D-12 | Rol Contabilidad (solo lectura) | 🔴 | Tabla 9 y HU-03 lo mencionan; no existe el rol (D-02) |
-| D-13 | Paginación | 🔧 | Con muchos registros la tabla se vuelve pesada |
+| D-13 | Paginación | ✅ | Selector de filas por página y de página (10/25/50/100) |
+| D-14 | Distribución de resultados | ✅ | Conteo por estado y por tipo dentro de la selección filtrada |
 
 ### 4.7 Módulo `vigencia.py` (RF-05 / CU-06 / QA-06)
 
@@ -268,12 +273,13 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | PR-05 | Baja lógica | Completado | ✅ `vigencia_log`, salvaguarda, reactivación y expulsión de sesión | — |
 | PR-06 | Firma incrustada | En proceso | ✅ Completado: 3 firmas capturadas, persistidas y estampadas | — |
 
-**Cobertura automatizada actual:** 50 pruebas pytest + 38 checks del smoke test.
+**Cobertura automatizada actual:** 64 pruebas pytest + 43 checks del smoke test.
 Cubren: días hábiles, seguridad, transiciones válidas/inválidas, historial,
 firma obligatoria y persistida, PDF con 3 imágenes, `ruta_pdf`, limpieza de
 temporales, integración contra BD real, render de los 3 paneles, login inactivo
-(QA-01) y vigencia con fechas controladas (QA-06). **Faltan:** RBAC negativo
-entre roles, filtros del dashboard, cifrado y sello del PDF.
+(QA-01), vigencia con fechas controladas (QA-06), filtros combinados del
+dashboard, KPIs, exportación CSV y descarga del PDF final (RF-04 / HU-03).
+**Faltan:** RBAC negativo entre roles, cifrado y sello del PDF.
 
 ---
 
@@ -292,15 +298,15 @@ entre roles, filtros del dashboard, cifrado y sello del PDF.
 
 ### P1 — Cumplimiento funcional incompleto
 
-| ID | Hallazgo | Requerimiento |
-|---|---|---|
-| H-07 | Falta saldo de días de vacaciones | RF-01 |
-| H-08 | Faltan filtros por fecha y tipo en el dashboard | RF-04 |
-| H-09 | Falta descarga del PDF final desde el dashboard | HU-03 |
+| ID | Hallazgo | Detalle | Requerimiento |
+|---|---|---|---|
+| H-07 | Falta saldo de días de vacaciones | Días asignados – usados = disponibles | RF-01 |
+| ~~H-08~~ ✅ | ~~Faltan filtros por fecha y tipo en el dashboard~~ **Resuelto Fase 4** | `filtrar_solicitudes` con solapamiento de fechas y selector de tipo | RF-04 |
+| ~~H-09~~ ✅ | ~~Falta descarga del PDF final desde el dashboard~~ **Resuelto Fase 4** | `preparar_pdf_descarga` + botón en el panel gerencial | HU-03 |
 | ~~H-10~~ ✅ | ~~`ruta_pdf` nunca se guarda~~ **Resuelto Fase 2** | `services/documentos.py` persiste la ruta | RF-03 / trazabilidad |
-| H-11 | Datos sensibles y firmas sin cifrar | RNF-01 |
+| H-11 | Datos sensibles y firmas sin cifrar | Base64 y texto en claro en la BD | RNF-01 |
 | ~~H-12~~ ✅ | ~~Esquema SQL no versionado~~ **Resuelto Fase 0** | `docs/schema.sql` validado en esquema temporal | Reproducibilidad / defensa |
-| H-13 | PDF sin sello de integridad | “Inalterable” / Dto. 47-2008 |
+| H-13 | PDF sin sello de integridad | Sin hash verificable del documento | “Inalterable” / Dto. 47-2008 |
 
 ### P2 — Calidad, robustez y acabado
 
@@ -314,7 +320,7 @@ entre roles, filtros del dashboard, cifrado y sello del PDF.
 | H-19 | 🟡 Suite unitaria + integración + AppTest lista; falta CI |
 | H-20 | 🟡 README listo; falta guía de despliegue |
 | H-21 | Advertencia de pandas / SQLAlchemy |
-| H-22 | Sin paginación ni exportación |
+| ~~H-22~~ ✅ | ~~Sin paginación ni exportación~~ **Resuelto Fase 4**: paginación y CSV compatible con Excel |
 | H-23 | Sin logging estructurado |
 
 ---
@@ -400,17 +406,19 @@ residuos).
 
 ### Fase 4 — Dashboard completo (2 días) · P1
 
-- [ ] **H-08** Filtros por rango de fechas y por tipo de incidencia (además de nombre y estado).
-- [ ] **D-01** KPIs completos: por estado, por tipo, pendientes de coordinador, pendientes de gerencia.
-- [ ] **H-09** Botón de descarga del PDF final con todas las firmas (HU-03).
-- [ ] **D-10** Exportación CSV/Excel del resultado filtrado.
-- [ ] **D-11** Alertas in-app de solicitudes pendientes.
-- [ ] **D-02** Rol Contabilidad de solo lectura (si se aprueba).
-- [ ] **D-13** Paginación del repositorio.
-- [ ] Pruebas: cada filtro por separado y combinados; descarga con firmas; permisos del rol.
+- [x] **H-08** Filtros por rango de fechas y por tipo de incidencia (además de nombre y estado).
+- [x] **D-01** KPIs completos: total, ingresadas, pendientes de coordinador, pendientes de gerencia y finalizadas.
+- [x] **H-09** Botón de descarga del PDF final con todas las firmas (HU-03).
+- [x] **D-10** Exportación CSV compatible con Excel del resultado filtrado.
+- [x] **D-11** Alertas in-app de solicitudes pendientes.
+- [ ] **D-02** Rol Contabilidad de solo lectura (diferido; ver D-02).
+- [x] **D-13** Paginación del repositorio.
+- [x] Pruebas: cada filtro por separado y combinados; descarga con firmas; exportación.
 
 **Criterio de aceptación:** Gerencia/Contabilidad pueden encontrar un expediente
-por nombre, fecha y tipo, ver sus KPIs y descargar el PDF final.
+por nombre, fecha y tipo, ver sus KPIs y descargar el PDF final. ✅ **Cumplido**
+(64 pruebas, 43 checks y `test_dashboard_integration` verificando 3 firmas en el
+PDF; rol Contabilidad diferido por D-02).
 
 ### Fase 5 — RF-01 y validaciones de negocio (1 día) · P1
 
@@ -473,31 +481,32 @@ Una tarea se considera cerrada solo si:
 | Motor PDF | 90 % | 🟢 |
 | Workflow / trazabilidad | 90 % | 🟢 |
 | Firmas (3 roles) | 95 % | 🟢 |
-| Dashboard / métricas | 45 % | 🔴 |
+| Dashboard / métricas | 95 % | 🟢 |
 | Vigencia | 95 % | 🟢 |
 | Seguridad RNF | 55 % | 🟡 |
-| Pruebas / evidencias | 90 % | 🟢 |
+| Pruebas / evidencias | 95 % | 🟢 |
 | Documentación técnica | 90 % | 🟢 |
-| **Total ponderado** | **~88 %** | 🟡 |
+| **Total ponderado** | **~92 %** | 🟢 |
 
 ---
 
 ## 12. Próximo paso recomendado
 
-Continuar con la **Fase 4 — Dashboard completo**:
+Continuar con la **Fase 5 — RF-01 y validaciones de negocio**:
 
-1. Filtros por rango de fechas y por tipo de incidencia, además de nombre y
-   estado (**H-08**).
-2. KPIs completos: por estado, por tipo, pendientes de coordinador y de
-   gerencia.
-3. Descarga del PDF final desde el dashboard (**H-09**, HU-03).
-4. Exportación CSV/Excel del resultado filtrado (**D-10**).
-5. Alertas in-app de solicitudes pendientes (**D-11**).
-6. Evaluar el rol Contabilidad de solo lectura (**D-02**).
-7. Pruebas: cada filtro por separado y combinados; descarga con firmas; permisos.
+1. Saldo de vacaciones (días asignados, usados y disponibles) en el panel del
+   consultor (**H-07**, decisión D-03).
+2. Validar `fecha_fin >= fecha_inicio` en el servidor y unificar mensajes
+   (**H-16**).
+3. Descontar feriados de Guatemala del cálculo de días hábiles (**H-17**,
+   decisión D-04).
+4. Seleccionar al jefe GTC desde los usuarios con rol Coordinador (**H-18**).
+5. Pruebas: saldo correcto tras varias solicitudes, fechas inválidas rechazadas
+   y feriado descontado.
 
-Con las Fases 0–3 cerradas, la Fase 4 completa RF-04 y HU-03, y deja el módulo
-de auditoría listo para la defensa.
+Con las Fases 0–4 cerradas, la Fase 5 completa RF-01 y elimina los datos
+imposibles; la Fase 6 cierra los RNF (cifrado y sello del PDF) y la regresión
+final para la defensa.
 
 ---
 

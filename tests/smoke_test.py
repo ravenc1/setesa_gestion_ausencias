@@ -30,6 +30,7 @@ from src.core.workflow import (
 )
 from src.core.security import hash_password
 from src.core.utils import calcular_dias_habiles
+from src.core.reportes import exportar_csv, filtrar_solicitudes
 from src.core.solicitudes import (
     TransicionInvalida,
     cambiar_estado,
@@ -46,7 +47,8 @@ from src.core.vigencia import (
     usuario_activo,
 )
 from src.features.registro import registrar_solicitud_firmada, obtener_mis_solicitudes
-from src.services.documentos import generar_pdf_solicitud
+from src.features.dashboard import obtener_solicitudes
+from src.services.documentos import generar_pdf_solicitud, preparar_pdf_descarga
 from src.services.motor_pdf import generar_pdf_accion_personal
 
 resultados = []
@@ -324,6 +326,86 @@ def test_consultor_flujo():
         print("   (datos de prueba del consultor eliminados)")
 
 
+def test_dashboard_gerencia():
+    """Repositorio, filtros, CSV y descarga del PDF final (RF-04 / HU-03)."""
+    conn = get_connection()
+    if not conn:
+        check("dashboard: repositorio y descarga", False, "-> sin conexión")
+        return
+
+    ids = _ids_por_rol(conn)
+    id_consultor = ids.get("Consultor")
+    id_coordinador = ids.get("Coordinador GTC")
+    id_admin = ids.get("Administrador")
+    if not all((id_consultor, id_coordinador, id_admin)):
+        check("dashboard: repositorio y descarga", False, "-> faltan usuarios")
+        conn.close()
+        return
+
+    marca = f"TEST_DASHBOARD_{uuid4().hex[:8]}"
+    id_solicitud = None
+    ruta_pdf = None
+    try:
+        id_solicitud = registrar_solicitud(
+            id_consultor, "VACACION",
+            datetime.date(2030, 1, 7), datetime.date(2030, 1, 11),
+            "Jefe GTC", "Consultor", "C-001", 5, marca, firma_dummy_b64(),
+        )
+        cambiar_estado(
+            id_solicitud, ESTADO_PENDIENTE_APROBACION_GERENCIA,
+            id_coordinador, "Firma de prueba.", firma_b64=firma_dummy_b64(),
+        )
+        cambiar_estado(
+            id_solicitud, ESTADO_FINALIZADA, id_admin, "Cierre de prueba.",
+            firma_b64=firma_dummy_b64(),
+        )
+
+        df = obtener_solicitudes()
+        check("dashboard: el repositorio incluye el expediente",
+              id_solicitud in set(df["id_solicitud"].tolist()))
+        check("dashboard: columnas para filtros y descarga",
+              {"fecha_inicio", "fecha_fin", "tipo_ausencia", "ruta_pdf"}
+              <= set(df.columns))
+
+        nombre = df.loc[
+            df["id_solicitud"] == id_solicitud, "nombre_completo"
+        ].iloc[0]
+        df_filtrado = filtrar_solicitudes(
+            df,
+            nombre=nombre,
+            estado=ESTADO_FINALIZADA,
+            tipo="VACACION",
+            fecha_desde=datetime.date(2030, 1, 1),
+            fecha_hasta=datetime.date(2030, 1, 31),
+        )
+        check("dashboard: filtros combinados (nombre, estado, tipo y fecha)",
+              id_solicitud in set(df_filtrado["id_solicitud"].tolist()))
+
+        csv = exportar_csv(df_filtrado).decode("utf-8-sig")
+        check("dashboard: exportación CSV incluye el expediente",
+              str(id_solicitud) in csv and nombre in csv)
+
+        ruta_pdf, contenido = preparar_pdf_descarga(id_solicitud)
+        check("dashboard: PDF final descargable con 3 firmas",
+              contenido.startswith(b"%PDF")
+              and contenido.count(b"/Subtype /Image") == 3,
+              f"-> {Path(ruta_pdf).name}")
+    except Exception as e:
+        check("dashboard: repositorio y descarga", False, f"-> {e}")
+    finally:
+        if ruta_pdf:
+            Path(ruta_pdf).unlink(missing_ok=True)
+        if id_solicitud:
+            cursor = conn.cursor()
+            cursor.execute(
+                "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
+            )
+            conn.commit()
+            cursor.close()
+        conn.close()
+        print("   (datos de prueba del dashboard eliminados)")
+
+
 def test_vigencia():
     """Baja lógica semestral, auditoría y reactivación, con limpieza posterior."""
     conn = get_connection()
@@ -456,6 +538,7 @@ if __name__ == "__main__":
         conn.close()
     test_pdf()
     test_consultor_flujo()
+    test_dashboard_gerencia()
     test_vigencia()
 
     fallidos = [r for r in resultados if r[0] == "FAIL"]

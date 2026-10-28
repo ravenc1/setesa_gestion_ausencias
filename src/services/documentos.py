@@ -5,6 +5,8 @@
 # `solicitud.ruta_pdf`. Así cualquier panel obtiene el mismo documento sin
 # duplicar la lógica de armado.
 
+from pathlib import Path
+
 from src.core.solicitudes import actualizar_ruta_pdf, obtener_solicitud
 from src.services.motor_pdf import generar_pdf_accion_personal
 
@@ -37,3 +39,21 @@ def generar_pdf_solicitud(id_solicitud):
     )
     actualizar_ruta_pdf(id_solicitud, ruta)
     return ruta
+
+
+def preparar_pdf_descarga(id_solicitud, regenerar=False):
+    """Devuelve (ruta, contenido) del PDF oficial listo para descargar.
+
+    Reutiliza `solicitud.ruta_pdf` si el archivo existe; si falta, lo genera
+    desde la base. Con `regenerar=True` siempre reconstruye el documento.
+    """
+    datos = obtener_solicitud(id_solicitud)
+    if not datos:
+        raise ValueError(f"No existe la solicitud con id {id_solicitud}.")
+
+    ruta = datos.get("ruta_pdf")
+    if regenerar or not ruta or not Path(ruta).exists():
+        ruta = generar_pdf_solicitud(id_solicitud)
+
+    ruta = Path(ruta)
+    return ruta, ruta.read_bytes()
