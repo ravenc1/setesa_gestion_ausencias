@@ -1,8 +1,10 @@
 # Estructura del Proyecto — SETESA Workflow
 
-Organización por capas (Arquitectura Web de Tres Capas, según el documento del proyecto).
-Los módulos están en sus paquetes, con `import` absolutos, credenciales externalizadas
-y utilidades de prueba.
+Organización por capas (Arquitectura Web de Tres Capas, según el documento del
+proyecto). Los módulos están en sus paquetes, con `import` absolutos,
+credenciales externalizadas y utilidades de prueba.
+
+Estado actual: **Fases 0, 1, 2 y 3 completadas** (ver `docs/CHECKLIST_AVANCE.md`).
 
 ## Árbol
 
@@ -10,6 +12,8 @@ y utilidades de prueba.
 proyecto_setesa/
 ├── app.py                     # Punto de entrada (enrutador por rol)
 ├── requirements.txt           # Dependencias
+├── pytest.ini                 # Configuración de pruebas
+├── README.md                  # Guía de instalación y uso
 ├── .env                       # DATABASE_URL (NO versionar)
 ├── .env.example               # Plantilla de variables de entorno
 ├── .gitignore
@@ -20,7 +24,9 @@ proyecto_setesa/
 │   │   ├── database.py        # Conexión a PostgreSQL (lee .env)
 │   │   ├── auth.py            # Login con hash + RBAC
 │   │   ├── security.py        # Hashing PBKDF2 + rol_autorizado()
-│   │   ├── workflow.py        # Catálogo único de estados
+│   │   ├── workflow.py        # Estados y transiciones permitidas
+│   │   ├── solicitudes.py     # Servicio transaccional + historial
+│   │   ├── vigencia.py        # Baja lógica, auditoría y reactivación
 │   │   ├── catalogos.py       # Catálogo de tipos de ausencia
 │   │   ├── utils.py           # Lógica pura (calcular_dias_habiles)
 │   │   └── config.py          # Rutas centralizadas (storage/)
@@ -30,19 +36,40 @@ proyecto_setesa/
 │   │   ├── dashboard.py       # Panel gerencial (CU-05)
 │   │   └── vigencia.py        # Baja lógica semestral (CU-06)
 │   └── services/              # Servicios de soporte
-│       ├── motor_pdf.py       # Generación de PDF (RF-04)
+│       ├── documentos.py      # PDF oficial desde la BD + ruta_pdf
+│       ├── motor_pdf.py       # Generación de PDF (RF-03)
 │       └── utils_firma.py     # Firma canvas <-> Base64 (RF-06)
 │
 ├── scripts/
+│   ├── backup_datos.py        # Respaldo lógico JSON
+│   ├── migracion_fase1.py     # Historial + normalización de estados
+│   ├── migracion_fase3.py     # vigencia_log + restricciones
+│   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a hash
+│
 ├── tests/
-│   └── smoke_test.py          # Prueba E2E del workflow (rollback)
+│   ├── conftest.py            # sys.path + carga de .env
+│   ├── test_utils.py          # Días hábiles
+│   ├── test_workflow.py       # Catálogo y transiciones
+│   ├── test_security.py       # PBKDF2 y migración
+│   ├── test_utils_firma.py    # Canvas/Base64, nombres únicos y limpieza
+│   ├── test_solicitudes_integration.py  # BD real (skip sin DATABASE_URL)
+│   ├── test_documentos.py     # PDF con 3 firmas + ruta_pdf (BD real)
+│   ├── test_vigencia.py       # Baja lógica, auditoría y reactivación (BD real)
+│   ├── test_app_smoke.py      # Renderizado con AppTest + login inactivo
+│   └── smoke_test.py          # Prueba E2E manual (rollback/limpieza)
+│
+├── docs/
+│   ├── ESTRUCTURA.md          # Este archivo
+│   ├── CHECKLIST_AVANCE.md    # Estado y plan por fases
+│   ├── schema.sql             # DDL completo del esquema
+│   └── evidencias/            # Salidas de pruebas y capturas
 │
 ├── assets/                    # Recursos estáticos
 ├── storage/
 │   ├── pdf/                   # PDFs emitidos
-│   └── firmas/                # Imágenes temporales de firmas
-├── docs/
+│   ├── firmas/                # Imágenes temporales de firmas
+│   └── backups/               # Respaldos JSON (no versionar)
 └── proyecto_doc/              # Documento del proyecto (PDF)
 ```
 
@@ -55,49 +82,116 @@ proyecto_setesa/
 | `ESTADO_PENDIENTE_APROBACION_GERENCIA` | `Pendiente de Aprobación Gerencia` |
 | `ESTADO_FINALIZADA` | `Finalizada` |
 
+## Transiciones permitidas
+
+```
+Ingresada
+   └─► Pendiente de Firma Coordinador
+          └─► Pendiente de Aprobación Gerencia
+                 └─► Finalizada
+```
+
+- `workflow.puede_transicionar(origen, destino)` valida el cambio.
+- `workflow.siguiente_estado(actual)` devuelve el único paso permitido.
+- No se permiten saltos ni retrocesos.
+- Cada cambio se audita en `solicitud_historial`.
+
+### Decisión D-01 (opción C)
+
+El registro inserta la solicitud como `Ingresada` y, **en la misma transacción**,
+la pasa a `Pendiente de Firma Coordinador`. El historial conserva ambos eventos.
+Así se concilian HU-01/QA-03 (que exigen `Ingresada`) y la sección 4.12.3 de la
+tesis (que exige `Pendiente de Firma Coordinador`).
+
 ## Cómo ejecutar
 
 ```powershell
-# App
-venv\Scripts\streamlit run app.py
+# Instalar dependencias
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
 
-# Prueba E2E (no persiste datos: usa ROLLBACK)
-venv\Scripts\python tests\smoke_test.py
+# Respaldo previo (si la base ya tiene datos)
+.\venv\Scripts\python.exe scripts\backup_datos.py
+
+# Migración de esquema/datos (idempotente)
+.\venv\Scripts\python.exe scripts\migracion_fase1.py
+.\venv\Scripts\python.exe scripts\migracion_fase3.py
+
+# Vigencia semestral programada (solo si venció el periodo)
+.\venv\Scripts\python.exe scripts\vigencia_semestral.py
+# Forzar una ejecución (pruebas / cierre de semestre)
+.\venv\Scripts\python.exe scripts\vigencia_semestral.py --forzar
+
+# App
+.\venv\Scripts\streamlit run app.py
+
+# Suite automatizada
+.\venv\Scripts\python.exe -m pytest
+
+# Prueba E2E (no deja datos de prueba)
+.\venv\Scripts\python.exe tests\smoke_test.py
 
 # Migración de contraseñas heredadas a hash
-venv\Scripts\python scripts\hash_passwords.py
+.\venv\Scripts\python.exe scripts\hash_passwords.py
 ```
 
 ## Arreglos aplicados
 
 1. **Canvas / Streamlit**: alineado a `streamlit==1.66.0`. El error de
    `streamlit-drawable-canvas` solo ocurría al importarlo **fuera** del runtime;
-   bajo `streamlit run` (que ejecuta la exploración de componentes) funciona.
+   bajo `streamlit run` funciona.
 2. **Rutas de salida**: `motor_pdf.py` escribe en `storage/pdf/` y
    `utils_firma.py` en `storage/firmas/`, vía `src/core/config.py`.
-3. **Prueba E2E**: `tests/smoke_test.py` valida workflow, conexión y PDF (11/11 OK).
-4. **Seguridad**: contraseñas migradas a PBKDF2-SHA256 (`scripts/hash_passwords.py`);
+3. **Seguridad**: contraseñas migradas a PBKDF2-SHA256 (`scripts/hash_passwords.py`);
    `auth.py` valida con `security.verify_or_upgrade` y auto-migra al iniciar sesión.
-   Se agregó RBAC por módulo (`rol_autorizado`) como defensa en profundidad.
+   Se agregó RBAC por módulo (`rol_autorizado`).
+4. **Fase 0 (línea base)**: `docs/schema.sql`, `README.md`, `pytest.ini`,
+   34 pruebas automatizadas iniciales y respaldo JSON (hoy 50).
+5. **Fase 1 (coherencia del workflow)**:
+   - `src/core/solicitudes.py` centraliza registro y cambios de estado.
+   - `solicitud_historial` audita cada transición.
+   - `CHECK` en `estado_workflow`, `NOT NULL` e índices.
+   - Migración del estado legado `"En revisión por jefe inmediato GTC"`.
+   - El dashboard ya no permite saltos arbitrarios: Gerencia solo finaliza
+     expedientes en `Pendiente de Aprobación Gerencia`.
+   - Los paneles muestran el historial de estados.
+6. **Fase 2 (firmas completas)**:
+   - Canvas y firma obligatoria en el panel del Coordinador GTC
+     (`firma_jefe_gtc`) y en el Dashboard de Gerencia (`firma_gerencia`).
+   - `cambiar_estado(..., firma_b64=...)` exige y persiste la firma en la misma
+     transacción (`FirmaRequerida` si falta).
+   - `src/services/documentos.py` genera el PDF desde la BD, con las firmas
+     disponibles, y guarda `solicitud.ruta_pdf`.
+   - El PDF imprime `(Pendiente Autorización)` solo cuando falta la firma.
+   - Nombres temporales con `uuid` y PDF determinista por `id_solicitud`;
+     limpieza automática de imágenes temporales.
+7. **Fase 3 (vigencia robusta)**:
+   - `src/core/vigencia.py` centraliza detección, baja lógica, auditoría,
+     reactivación y ejecución automática.
+   - `ultima_actividad` se actualiza en login y en registro/firma de solicitudes
+     (`marcar_actividad`); un usuario dado de baja no recupera actividad al
+     intentar entrar.
+   - El rol `Administrador` y el ejecutor quedan excluidos de la baja.
+   - `vigencia_log` registra `DEPURACION`, `AUTOMATICA` y `REACTIVACION` con
+     fecha, ejecutor, afectados y detalle.
+   - Al iniciar sesión Gerencia se ejecuta la depuración si pasaron 6 meses;
+     `scripts/vigencia_semestral.py` permite programarla fuera de la app.
+   - `app.py` revalida la vigencia en cada rerun y expulsa sesiones dadas de baja.
+   - El panel de Gerencia muestra candidatos, ejecución, reactivación e historial.
 
-## Módulo Consultor — finalizado
+## Módulo Consultor
 
 - `registro.py` usa import perezoso del canvas (`st_canvas`) dentro de
-  `mostrar_formulario`, por lo que el módulo es importable sin runtime (testeable).
-- Cubierto por `tests/smoke_test.py` (registro + historial + PDF) y por la prueba
-  de UI (login → llenar formulario → "Firmar Electrónicamente" → canvas sin errores).
-
-## Limpieza aplicada
-
-- Eliminados artefactos viejos: `temp_pdf/` y `temp_firma_emp.png`.
-- `motor_pdf.py` usa el catálogo de estados (eliminado el literal `"Aprobada"`).
-- Migrado `use_container_width` → `width="stretch"` en todo el proyecto.
-- Eliminados imports sin uso (`os`, `numpy`) en `registro.py` y `utils_firma.py`.
+  `mostrar_formulario`, por lo que el módulo es importable sin runtime.
+- Cubierto por `tests/smoke_test.py`, `test_solicitudes_integration.py` y
+  `test_app_smoke.py`.
 
 ## Pendientes conocidos
 
-- Flujo del Coordinador: hoy pasa directo a `Pendiente de Aprobación Gerencia`; el
-  estado `ESTADO_PENDIENTE_FIRMA_COORDINADOR` aún no se usa (decisión de negocio).
-- Advertencia de pandas: `pd.read_sql_query` con conexión DBAPI2 (considerar SQLAlchemy).
-- `motor_pdf.py`: `limpiar_nombre`/plantilla con literales propios; revisar si se
-  centralizan.
+- **Fase 4 (P1)**: filtros por fecha y tipo, descarga del PDF final desde el
+  dashboard, exportación, alertas y rol Contabilidad.
+- **Fase 5 (P1)**: saldo de días de vacaciones (RF-01), validación de fechas y
+  feriados.
+- **Fase 6 (P1/P2)**: cifrado de datos sensibles, sello SHA-256 del PDF,
+  SQLAlchemy (elimina la advertencia de pandas) y logging.
+- Advertencia de pandas: `pd.read_sql_query` con conexión DBAPI2 (se resuelve
+  en la Fase 6 con SQLAlchemy).
