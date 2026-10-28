@@ -13,10 +13,16 @@ __pycache__/
 # Archivos generados en tiempo de ejecución
 storage/pdf/*
 storage/firmas/*
+storage/backups/
 !storage/pdf/.gitkeep
 !storage/firmas/.gitkeep
 temp_pdf/
 temp_firma_*.png
+
+# Pruebas y artefactos
+.pytest_cache/
+docs/_tesis_extraida.txt
+*.log
 
 # Entornos de editor
 .vscode/

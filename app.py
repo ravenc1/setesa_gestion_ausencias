@@ -13,6 +13,19 @@ if 'logged_in' not in st.session_state:
 if not st.session_state['logged_in']:
     auth.show_login()
 else:
+    # A-06: revalidar la vigencia en cada rerun para que una baja lógica
+    # aplicada por Gerencia expulse también a las sesiones abiertas.
+    from src.core.vigencia import usuario_activo
+
+    if not usuario_activo(st.session_state.get('id_usuario')):
+        st.session_state.clear()
+        st.warning(
+            "Su acceso fue desactivado por inactividad (baja lógica). "
+            "Contacte a Gerencia para solicitar la reactivación."
+        )
+        auth.show_login()
+        st.stop()
+
     st.sidebar.title("Perfil de Usuario")
     st.sidebar.write(f"**Nombre:** {st.session_state['nombre']}")
     st.sidebar.write(f"**Rol RBAC:** {st.session_state['rol']}")

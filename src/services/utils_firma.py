@@ -2,8 +2,12 @@
 
 
 import base64
-from PIL import Image
 import io
+from pathlib import Path
+from uuid import uuid4
+
+from PIL import Image
+
 from src.core.config import FIRMAS_DIR, ensure_dirs
 
 def canvas_to_base64(canvas_image_data):
@@ -52,11 +56,17 @@ def canvas_to_base64(canvas_image_data):
         
     return None
 
-def base64_to_image(base64_str, output_filename="temp_firma.png"):
-    """Toma un string Base64 y crea un archivo temporal para FPDF."""
+def base64_to_image(base64_str, output_filename=None):
+    """Toma un string Base64 y crea un archivo temporal para FPDF.
+
+    Si no se indica ``output_filename`` se genera un nombre único (uuid) para
+    evitar colisiones entre usuarios concurrentes. Devuelve la ruta o None.
+    """
     if base64_str and isinstance(base64_str, str) and base64_str.strip():
         try:
             ensure_dirs()
+            if not output_filename:
+                output_filename = f"temp_firma_{uuid4().hex}.png"
             ruta = FIRMAS_DIR / output_filename
             img_data = base64.b64decode(base64_str)
             with open(ruta, "wb") as f:
@@ -66,3 +76,15 @@ def base64_to_image(base64_str, output_filename="temp_firma.png"):
             print(f"Error decodificando la firma: {e}")
             return None
     return None
+
+
+def eliminar_archivo(ruta):
+    """Elimina un archivo temporal sin propagar errores (limpieza best-effort)."""
+    if not ruta:
+        return False
+    try:
+        Path(ruta).unlink(missing_ok=True)
+        return True
+    except OSError as e:
+        print(f"No se pudo eliminar el temporal {ruta}: {e}")
+        return False

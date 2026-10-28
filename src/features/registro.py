@@ -5,31 +5,25 @@ import datetime
 import pandas as pd
 from src.services.utils_firma import canvas_to_base64
 from src.core.database import get_connection
-from src.services.motor_pdf import generar_pdf_accion_personal
-from src.core.workflow import ESTADO_INGRESADA
+from src.services.documentos import generar_pdf_solicitud
 from src.core.security import rol_autorizado
 from src.core.catalogos import OPCIONES_AUSENCIA
 from src.core.utils import calcular_dias_habiles
+from src.core.solicitudes import registrar_solicitud, obtener_historial
 
 def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, jefe, puesto, codigo, dias, exp, firma_b64):
-    """Inserta la solicitud en PostgreSQL incluyendo la firma manuscrita digitalizada."""
-    conn = get_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            query = """
-                INSERT INTO solicitud 
-                (id_usuario, tipo_ausencia, fecha_inicio, fecha_fin, estado_workflow, jefe_gtc, puesto, codigo_empleado, dias_solicitados, explicacion, firma_empleado)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """
-            cursor.execute(query, (id_us, tipo, f_ini, f_fin, ESTADO_INGRESADA, jefe, puesto, codigo, dias, exp, firma_b64))
-            conn.commit()
-            cursor.close()
-            conn.close()
-            return True
-        except Exception as e:
-            st.error(f"Error BD: {e}")
-            return False
+    """Inserta la solicitud y su historial en una sola transacción.
+
+    Devuelve el id_solicitud generado o None si falla. El servicio deja la
+    solicitud en 'Pendiente de Firma Coordinador' (decisión D-01, opción C).
+    """
+    try:
+        return registrar_solicitud(
+            id_us, tipo, f_ini, f_fin, jefe, puesto, codigo, dias, exp, firma_b64
+        )
+    except Exception as e:
+        st.error(f"Error BD: {e}")
+        return None
 
 def obtener_mis_solicitudes(id_usuario):
     conn = get_connection()
@@ -66,16 +60,19 @@ def mostrar_formulario():
     with tab1:
         if st.session_state.solicitud_enviada:
             # Mensaje de éxito actualizado
-            st.success("✅ ¡Su solicitud fue firmada electrónicamente y enviada a su Jefe Inmediato GTC y a Gerencia SETESA para su revisión!")
-            with open(st.session_state.pdf_generado, "rb") as f:
-                st.download_button("📥 Descargar Comprobante (PDF)", data=f, file_name="Accion_Personal_SETESA.pdf", mime="application/pdf", type="primary")
+            st.success("✅ ¡Su solicitud fue firmada electrónicamente y enviada al Coordinador GTC para su visto bueno!")
+            if st.session_state.pdf_generado:
+                with open(st.session_state.pdf_generado, "rb") as f:
+                    st.download_button("📥 Descargar Comprobante (PDF)", data=f, file_name="Accion_Personal_SETESA.pdf", mime="application/pdf", type="primary")
+            else:
+                st.warning("La solicitud quedó registrada, pero el PDF no está disponible. Consulte la pestaña de historial.")
             st.write("---")
             if st.button("⬅️ Regresar y redactar una nueva solicitud"):
                 st.session_state.solicitud_enviada = False
                 st.session_state.mostrar_canvas_firma = False
                 st.rerun()
         else:
-            st.info("Complete el formulario. Al firmar electrónicamente, el documento oficial se remitirá al banco.")
+            st.info("Complete el formulario. Al firmar electrónicamente, la solicitud se enviará al Coordinador GTC para su visto bueno.")
             col1, col2 = st.columns(2)
             with col1:
                 jefe_gtc = st.text_input("PARA: (Nombre del Jefe Inmediato GTC)")
@@ -100,7 +97,7 @@ def mostrar_formulario():
                         if not jefe_gtc or not explicacion:
                             st.error("❌ Llene todos los campos para proceder.")
                         elif dias_solicitados == 0:
-                            st.error("❌ El rango corresponde solo a fines de semana.")
+                            st.error("❌ El rango seleccionado no contiene días hábiles (solo fines de semana).")
                         else:
                             st.session_state.mostrar_canvas_firma = True
                             st.rerun()
@@ -135,20 +132,25 @@ def mostrar_formulario():
                         if not firma_base64:
                             st.error("❌ Debe dibujar su firma en el recuadro antes de enviar.")
                         else:
-                            nom = st.session_state['nombre']
                             id_us = st.session_state['id_usuario']
                             
-                            if registrar_solicitud_firmada(id_us, tipo_ausencia, fecha_inicio, fecha_fin, jefe_gtc, puesto, codigo, dias_solicitados, explicacion, firma_base64):
-                                # Pasamos explícitamente la fecha de hoy y la firma base64 al PDF
-                                fecha_actual = datetime.date.today().strftime("%Y-%m-%d")
-                                ruta = generar_pdf_accion_personal(
-                                    nom, jefe_gtc, puesto, codigo, tipo_ausencia, 
-                                    str(fecha_inicio), str(fecha_fin), dias_solicitados, explicacion, 
-                                    ESTADO_INGRESADA,
-                                    fecha_creacion=fecha_actual,
-                                    firma_empleado_b64=firma_base64
-                                )
-                                st.session_state.pdf_generado = ruta
+                            id_solicitud = registrar_solicitud_firmada(
+                                id_us, tipo_ausencia, fecha_inicio, fecha_fin,
+                                jefe_gtc, puesto, codigo, dias_solicitados,
+                                explicacion, firma_base64,
+                            )
+                            if id_solicitud:
+                                # El servicio toma los datos ya persistidos y
+                                # guarda la ruta en solicitud.ruta_pdf.
+                                ruta = None
+                                try:
+                                    ruta = generar_pdf_solicitud(id_solicitud)
+                                except Exception as e:
+                                    st.warning(
+                                        "La solicitud se guardó, pero no se pudo "
+                                        f"generar el PDF: {e}"
+                                    )
+                                st.session_state.pdf_generado = ruta or ""
                                 st.session_state.solicitud_enviada = True
                                 st.session_state.mostrar_canvas_firma = False
                                 st.rerun()
@@ -172,17 +174,21 @@ def mostrar_formulario():
             fila = df_historial[df_historial['id_solicitud'] == id_descarga].iloc[0]
             
             if st.button("Generar y Descargar PDF Actualizado"):
-                # Regeneración del PDF extrayendo las fechas y firmas directamente del Dataframe (BD)
-                pdf_historial = generar_pdf_accion_personal(
-                    st.session_state['nombre'], fila['jefe_gtc'], fila['puesto'], fila['codigo_empleado'], 
-                    fila['tipo_ausencia'], fila['fecha_inicio'], fila['fecha_fin'], fila['dias_solicitados'], 
-                    fila['explicacion'], fila['estado_workflow'],
-                    fecha_creacion=str(fila['fecha_creacion']),
-                    firma_empleado_b64=fila.get('firma_empleado'),
-                    firma_jefe_b64=fila.get('firma_jefe_gtc'),
-                    firma_gerencia_b64=fila.get('firma_gerencia')
-                )
-                with open(pdf_historial, "rb") as f:
-                    st.download_button(f"📥 Descargar Expediente #{id_descarga} ({fila['estado_workflow']})", data=f, file_name=f"Expediente_{id_descarga}.pdf", mime="application/pdf", type="primary")
+                # Regeneración desde la BD: incluye las firmas ya capturadas y
+                # actualiza solicitud.ruta_pdf.
+                try:
+                    pdf_historial = generar_pdf_solicitud(id_descarga)
+                except Exception as e:
+                    st.error(f"No se pudo generar el PDF: {e}")
+                else:
+                    with open(pdf_historial, "rb") as f:
+                        st.download_button(f"📥 Descargar Expediente #{id_descarga} ({fila['estado_workflow']})", data=f, file_name=f"Expediente_{id_descarga}.pdf", mime="application/pdf", type="primary")
+
+            with st.expander(f"🕓 Historial de estados del expediente #{id_descarga}"):
+                df_movimientos = obtener_historial(id_descarga)
+                if df_movimientos.empty:
+                    st.info("Sin movimientos registrados.")
+                else:
+                    st.dataframe(df_movimientos, hide_index=True, width="stretch")
         else:
             st.info("Aún no tienes solicitudes registradas.")
