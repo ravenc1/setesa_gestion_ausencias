@@ -55,6 +55,7 @@ proyecto_setesa/
 │   ├── migracion_fase3.py     # vigencia_log + restricciones
 │   ├── migracion_fase5.py     # saldo de vacaciones + catálogo de feriados
 │   ├── migracion_fase6.py     # sello SHA-256 + cifrado de datos heredados
+│   ├── migracion_fase7.py     # rol Contabilidad (HU-03) + cuenta demo
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a hash
 │
@@ -74,6 +75,7 @@ proyecto_setesa/
 │   ├── test_vacaciones.py     # Saldo asignado − usado (BD real)
 │   ├── test_validaciones.py   # Reglas de fechas y saldo
 │   ├── test_app_smoke.py      # Renderizado con AppTest + login inactivo
+│   ├── test_rbac_contabilidad.py  # HU-03: panel de solo lectura
 │   └── smoke_test.py          # Prueba E2E manual (rollback/limpieza)
 │
 ├── docs/
@@ -249,12 +251,14 @@ ambas en los secrets de Streamlit). La guía completa está en
 
 ## Pendientes conocidos
 
-- **D-02**: rol Contabilidad de solo lectura (diferido; la tesis usa
-  Administrador como beneficiario del dashboard).
 - **R-11**: recordatorio al banco (diferido; sin correo institucional).
 - **D-06**: rechazo/devolución con motivo (diferido; fuera del alcance acordado).
-- **Transcripción documental**: llevar el estado final de la Fase 6 a las tablas
-  25, 26 y 27 del PDF de la tesis y preparar la defensa.
+- **Gestión de usuarios**: alta/edición/reseteo desde el panel (siguiente mejora).
+
+**Cerrado en la Fase 7:** D-02 (rol Contabilidad de solo lectura, HU-03).
+
+**Nota documental:** el documento de tesis quedó cerrado el 04/11/2026; las
+mejoras posteriores se registran solo en este repositorio y no modifican el PDF.
 
 Los RNF de cifrado, integridad, logging y CI quedaron cerrados en la Fase 6. La
 advertencia de pandas desapareció al migrar las lecturas a SQLAlchemy.

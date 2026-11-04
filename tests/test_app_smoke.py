@@ -25,7 +25,9 @@ def test_pantalla_login_sin_excepciones():
 @pytest.mark.skipif(
     not os.getenv("DATABASE_URL"), reason="Requiere DATABASE_URL."
 )
-@pytest.mark.parametrize("rol", ["Consultor", "Coordinador GTC", "Administrador"])
+@pytest.mark.parametrize(
+    "rol", ["Consultor", "Coordinador GTC", "Administrador", "Contabilidad"]
+)
 def test_panel_por_rol_sin_excepciones(rol):
     conn = get_connection()
     if not conn:

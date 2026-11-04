@@ -145,7 +145,8 @@ CREATE INDEX IF NOT EXISTS idx_feriado_fecha
 INSERT INTO rol (nombre_rol, descripcion_rol) VALUES
     ('Consultor', 'Registra solicitudes de ausencia y consulta su historial.'),
     ('Administrador', 'Gerencia: autoriza solicitudes, consulta métricas y ejecuta la vigencia.'),
-    ('Coordinador GTC', 'Jefe inmediato del banco: otorga el visto bueno de las solicitudes.')
+    ('Coordinador GTC', 'Jefe inmediato del banco: otorga el visto bueno de las solicitudes.'),
+    ('Contabilidad', 'Solo lectura: consulta el repositorio de expedientes y descarga el PDF final (HU-03).')
 ON CONFLICT (nombre_rol) DO NOTHING;
 
 -- Feriados nacionales de Guatemala (días completos). Semana Santa: jueves,

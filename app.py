@@ -47,6 +47,11 @@ else:
         # NUEVA RUTA PARA EL CLIENTE
         coordinador.mostrar_panel_coordinador()
         
+    elif st.session_state['rol'] == 'Contabilidad':
+        # HU-03: repositorio de expedientes en modo consulta.
+        st.title("Panel de Contabilidad - SETESA")
+        dashboard.mostrar_dashboard()
+
     elif st.session_state['rol'] == 'Administrador':
         st.title("Panel Gerencial - SETESA")
         tab1, tab2, tab3 = st.tabs(

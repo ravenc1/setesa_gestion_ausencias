@@ -14,7 +14,7 @@ from src.core.reportes import (
     nombre_archivo_csv,
     resumen_por_tipo,
 )
-from src.core.security import rol_autorizado
+from src.core.security import ROLES_PANEL, es_solo_lectura, rol_autorizado
 from src.core.solicitudes import (
     FirmaRequerida,
     TransicionInvalida,
@@ -184,18 +184,50 @@ def _mostrar_descargas(df_filtrado):
         )
 
 
+def _mostrar_trazabilidad(df_filtrado):
+    """Historial de estados en modo consulta (rol Contabilidad, HU-03)."""
+    st.write("---")
+    st.markdown("#### 🕓 Trazabilidad de los expedientes")
+
+    id_seleccionado = st.selectbox(
+        "ID de la Solicitud", df_filtrado["id_solicitud"].tolist()
+    )
+    fila = df_filtrado[df_filtrado["id_solicitud"] == id_seleccionado].iloc[0]
+    st.write(f"**Estado actual:** {fila['estado_workflow']}")
+
+    with st.expander(
+        f"🕓 Historial de estados del expediente #{id_seleccionado}"
+    ):
+        df_movimientos = obtener_historial(id_seleccionado)
+        if df_movimientos.empty:
+            st.info("Sin movimientos registrados.")
+        else:
+            st.dataframe(df_movimientos, hide_index=True, width="stretch")
+
+
 def mostrar_dashboard():
-    if not rol_autorizado(["Administrador"]):
-        st.error("Acceso denegado: esta sección es exclusiva del rol Administrador.")
+    if not rol_autorizado(ROLES_PANEL):
+        st.error(
+            "Acceso denegado: esta sección es exclusiva de Gerencia y "
+            "Contabilidad."
+        )
         return
 
-    st.markdown("### Panel de Control Gerencial y Aprobaciones")
+    solo_lectura = es_solo_lectura()
+    st.markdown(
+        "### Panel de Contabilidad – Repositorio de Expedientes"
+        if solo_lectura
+        else "### Panel de Control Gerencial y Aprobaciones"
+    )
     flash = st.session_state.pop("flash_gerencia", None)
     if flash:
         getattr(st, flash[0])(flash[1])
     st.info(
-        "Módulo de trazabilidad y gobernanza sobre las incidencias del personal "
-        "externo."
+        "Repositorio centralizado de solicitudes aprobadas para el proceso de "
+        "nómina (HU-03)."
+        if solo_lectura
+        else "Módulo de trazabilidad y gobernanza sobre las incidencias del "
+        "personal externo."
     )
 
     df_solicitudes = obtener_solicitudes()
@@ -290,6 +322,11 @@ def mostrar_dashboard():
     _mostrar_descargas(df_filtrado)
 
     if df_filtrado.empty:
+        return
+
+    # Contabilidad (HU-03): consulta y descarga, sin autorizar expedientes.
+    if solo_lectura:
+        _mostrar_trazabilidad(df_filtrado)
         return
 
     st.write("---")

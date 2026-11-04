@@ -38,7 +38,7 @@ están cerrados:**
    verificado desde el dashboard.
 
 **Conclusión:** el sistema está **100 % funcional** y con los RNF verificables
-cubiertos. Quedan únicamente decisiones diferidas (D-02, D-06, R-11) y la
+cubiertos. Quedan únicamente decisiones diferidas (D-06, R-11) y la
 transcripción del estado final a las tablas 25–27 del documento de tesis.
 
 ### Registro de avance
@@ -52,21 +52,23 @@ transcripción del estado final a las tablas 25–27 del documento de tesis.
 | 27/10/2026 | **Fase 4** | Filtros por nombre, estado, tipo y rango de fechas; KPIs completos; alertas; paginación; descarga del PDF final y exportación CSV. **H-08/H-09, D-10/D-11/D-13 cerrados.** |
 | 27/10/2026 | **Fase 5** | Saldo de vacaciones (asignado − usado), catálogo de feriados administrable, validación de fechas y saldo en servidor, jefe GTC desde usuarios. **H-07/H-16/H-17/H-18 y D-03/D-04 cerrados.** |
 | 27/10/2026 | **Fase 6** | Cifrado Fernet, sello SHA-256, SQLAlchemy, logging rotativo, CI y guía de despliegue. **H-11/H-13/H-19/H-20/H-21/H-23 y D-05 cerrados.** |
+| 04/11/2026 | **Fase 7** | Rol **Contabilidad** de solo lectura (HU-03): panel propio, filtros, trazabilidad y descarga del PDF final, sin autorización ni administración. **D-02 cerrado.** |
 
 **Evidencias:** `docs/evidencias/2026-10-27_fase0-1.md`,
 `docs/evidencias/2026-10-27_fase2.md`,
 `docs/evidencias/2026-10-27_fase3.md`,
 `docs/evidencias/2026-10-27_fase4.md`,
 `docs/evidencias/2026-10-27_fase5.md` y
-`docs/evidencias/2026-10-27_fase6.md`.
-**Pruebas al cierre:** `pytest` 93/93 y smoke test 57/57, sin datos de prueba
+`docs/evidencias/2026-10-27_fase6.md`; **Fase 7** en
+`docs/evidencias/2026-11-04_fase7.md`.
+**Pruebas al cierre:** `pytest` 97/97 y smoke test 57/57, sin datos de prueba
 residuales en la base.
 
 **Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-07, H-08, H-09,
 H-10, H-11, H-12, H-13, H-14, H-15, H-16, H-17, H-18, H-19, H-20, H-21, H-22,
 H-23 y D-01, D-03, D-04, D-05.
 **Hallazgos que siguen abiertos:** solo los diferidos R-11 (recordatorio al
-banco), D-02 (rol Contabilidad) y D-06 (rechazo/devolución).
+banco) y D-06 (rechazo/devolución).
 
 ---
 
@@ -233,7 +235,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | D-09 | Transiciones válidas (no saltos) | ✅ | Solo `Pendiente de Aprobación Gerencia` → `Finalizada` desde Gerencia | — |
 | D-10 | Exportar métricas (CSV/Excel) | ✅ | CSV UTF-8 con BOM, compatible con Excel (`exportar_csv`) |
 | D-11 | Alertas de pendientes | ✅ | Aviso in-app con conteo de coordinador y gerencia (4.12.3) |
-| D-12 | Rol Contabilidad (solo lectura) | 🔴 | Tabla 9 y HU-03 lo mencionan; no existe el rol (D-02) |
+| D-12 | Rol Contabilidad (solo lectura) | ✅ | Resuelto en Fase 7: panel propio con filtros, trazabilidad y descarga del PDF final |
 | D-13 | Paginación | ✅ | Selector de filas por página y de página (10/25/50/100) |
 | D-14 | Distribución de resultados | ✅ | Conteo por estado y por tipo dentro de la selección filtrada |
 
@@ -310,7 +312,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | PR-05 | Baja lógica | Completado | ✅ `vigencia_log`, salvaguarda, reactivación y expulsión de sesión | — |
 | PR-06 | Firma incrustada | En proceso | ✅ Completado: 3 firmas capturadas, persistidas y estampadas | — |
 
-**Cobertura automatizada actual:** 93 pruebas pytest + 57 checks del smoke test.
+**Cobertura automatizada actual:** 97 pruebas pytest + 57 checks del smoke test.
 Cubren: días hábiles con feriados, seguridad, transiciones válidas/inválidas,
 historial, firma obligatoria y persistida, PDF con 3 imágenes, `ruta_pdf`,
 limpieza de temporales, integración contra BD real, render de los 3 paneles,
@@ -372,7 +374,7 @@ RBAC positivo ya está cubierto por AppTest).
 | ID | Decisión | Opciones | Recomendación |
 |---|---|---|---|
 | **D-01** | Estado al registrar una solicitud | (A) `Ingresada` y el coordinador firma desde ahí · (B) `Pendiente de Firma Coordinador` desde el inicio · (C) registrar `Ingresada` y transicionar en la misma transacción, dejando historial de ambos | **C**: cumple HU-01/QA-03 y el paso 3 de 4.12.3, y hace que los 4 estados existan de verdad |
-| **D-02** | Rol “Contabilidad” | (A) Crear rol de solo lectura · (B) mantener solo Administrador | **A** si la defensa exige HU-03; **B** si se prioriza tiempo |
+| **D-02** | Rol “Contabilidad” | (A) Crear rol de solo lectura · (B) mantener solo Administrador | **A confirmada** (Fase 7): panel de solo lectura con filtros, trazabilidad y descarga del PDF final |
 | **D-03** | Origen del saldo de vacaciones | (A) campo `dias_vacaciones_asignados` en `usuario` · (B) cálculo por año a partir de solicitudes · (C) ambos | **C confirmada**: asignado − usado = disponible (Fase 5) |
 | **D-04** | Feriados | (A) tabla `feriado` administrable · (B) lista fija en código | **A confirmada**: tabla `feriado` con panel de Gerencia (Fase 5) |
 | **D-05** | Cifrado de datos sensibles | (A) Fernet en la app · (B) `pgcrypto` en PostgreSQL | **A confirmada** (clave en `.env`/`st.secrets`, sin exponerla a la BD) |
@@ -453,14 +455,14 @@ residuos).
 - [x] **H-09** Botón de descarga del PDF final con todas las firmas (HU-03).
 - [x] **D-10** Exportación CSV compatible con Excel del resultado filtrado.
 - [x] **D-11** Alertas in-app de solicitudes pendientes.
-- [ ] **D-02** Rol Contabilidad de solo lectura (diferido; ver D-02).
+- [x] **D-02** Rol Contabilidad de solo lectura (resuelto en Fase 7).
 - [x] **D-13** Paginación del repositorio.
 - [x] Pruebas: cada filtro por separado y combinados; descarga con firmas; exportación.
 
 **Criterio de aceptación:** Gerencia/Contabilidad pueden encontrar un expediente
 por nombre, fecha y tipo, ver sus KPIs y descargar el PDF final. ✅ **Cumplido**
 (64 pruebas, 43 checks y `test_dashboard_integration` verificando 3 firmas en el
-PDF; rol Contabilidad diferido por D-02).
+PDF; rol Contabilidad completado en Fase 7).
 
 ### Fase 5 — RF-01 y validaciones de negocio (1 día) · P1
 
@@ -484,12 +486,25 @@ diferido).
 - [x] **H-23** Logging centralizado.
 - [x] **H-19** Suite de pruebas completa (unitaria + integración + E2E) y CI.
 - [x] **H-20** README, `docs/ESTRUCTURA.md`, `docs/DESPLIEGUE.md` y evidencias.
-- [x] Regresión completa QA-01…QA-06 y PR-01…PR-06 (93 pytest + 57 smoke).
+- [x] Regresión completa QA-01…QA-06 y PR-01…PR-06 (97 pytest + 57 smoke).
 - [ ] Transcribir el estado final a las tablas 25, 26 y 27 del PDF de la tesis.
 
 **Criterio de aceptación:** 6/6 QA y 6/6 PR con evidencia; documentación
 reproducible; RNF verificables. ✅ **Cumplido** (la transcripción al PDF es una
 tarea documental del autor; el mapeo está en la evidencia de Fase 6).
+
+### Fase 7 — Rol Contabilidad (0.5 día) · cierra HU-03 / D-02
+
+- [x] **D-02** Crear el rol `Contabilidad` (id 4) en la base y en `docs/schema.sql`.
+- [x] **HU-03** Panel de Contabilidad de solo lectura: KPIs, filtros, tabla paginada, trazabilidad y descarga del PDF final con verificación SHA-256.
+- [x] **RBAC** Ocultar la gestión de workflow (firma y autorización) y las pestañas de Vigencia y Feriados para Contabilidad.
+- [x] **Migración** `scripts/migracion_fase7.py` idempotente, con cuenta demo opcional (`--usuario-demo`).
+- [x] Pruebas: `tests/test_rbac_contabilidad.py` (panel, solo lectura y regresión de Gerencia).
+- [x] Documentación: README, checklist y evidencia `docs/evidencias/2026-11-04_fase7.md`.
+
+**Criterio de aceptación:** un usuario con rol Contabilidad entra a su panel,
+consulta y descarga expedientes finalizados y **no** puede autorizar, firmar ni
+administrar catálogos. ✅ **Cumplido.**
 
 ---
 
@@ -522,12 +537,12 @@ Una tarea se considera cerrada solo si:
 
 | Área | Cumplimiento estimado | Estado |
 |---|---|---|
-| Autenticación / RBAC | 95 % | 🟢 |
+| Autenticación / RBAC | 100 % | 🟢 |
 | Registro de solicitudes | 98 % | 🟢 |
 | Motor PDF | 90 % | 🟢 |
 | Workflow / trazabilidad | 90 % | 🟢 |
 | Firmas (3 roles) | 95 % | 🟢 |
-| Dashboard / métricas | 95 % | 🟢 |
+| Dashboard / métricas | 100 % | 🟢 |
 | Vigencia | 95 % | 🟢 |
 | Vacaciones / feriados | 100 % | 🟢 |
 | Seguridad RNF | 100 % | 🟢 |
@@ -535,23 +550,27 @@ Una tarea se considera cerrada solo si:
 | Documentación técnica | 100 % | 🟢 |
 | **Total ponderado** | **~99 %** | 🟢 |
 
-El 1 % restante corresponde a decisiones fuera de alcance (D-02, D-06, R-11) y
-a la transcripción del estado final al PDF de la tesis.
+El 1 % restante corresponde a R-11 (recordatorio al banco) y a D-06
+(rechazo/devolución, fuera de alcance).
 
 ---
 
 ## 12. Próximo paso recomendado
 
-Las fases 0–6 están cerradas. Para la entrega y defensa:
+Las fases 0–7 están cerradas. Para la entrega y defensa:
 
-1. Transcribir a las tablas 25, 26 y 27 del PDF de la tesis el estado final
-   documentado en `docs/evidencias/2026-10-27_fase6.md`.
-2. Preparar la demostración: login por rol, registro con firma, aprobación GTC,
-   autorización de Gerencia, descarga del PDF sellado y verificación SHA-256.
-3. Mostrar la evidencia de calidad: 93 pruebas pytest, 57 checks E2E y CI en
+1. ~~Transcribir a las tablas 25, 26 y 27 del PDF de la tesis el estado final~~
+   **No aplica:** el documento de tesis quedó cerrado el 04/11/2026 y no se
+   modifica; las mejoras posteriores se documentan solo en este repositorio.
+2. Preparar la demostración: login por rol (incluido **Contabilidad**), registro
+   con firma, aprobación GTC, autorización de Gerencia, descarga del PDF sellado
+   y verificación SHA-256.
+3. Mostrar la evidencia de calidad: 97 pruebas pytest, 57 checks E2E y CI en
    GitHub Actions.
 4. Confirmar la custodia de `FERNET_KEY` y el respaldo de Supabase antes de la
    presentación.
+5. Siguiente mejora acordada: **R-11** (recordatorio al banco) y, después,
+   gestión de usuarios desde el panel de Gerencia.
 
 Con las Fases 0–6 cerradas, el proyecto queda listo para la defensa con evidencia
 de QA y RNF verificables.

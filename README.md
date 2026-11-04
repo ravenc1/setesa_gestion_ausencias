@@ -67,6 +67,7 @@ proyecto_setesa/
 │   ├── migracion_fase3.py     # vigencia_log + restricciones
 │   ├── migracion_fase5.py     # saldo de vacaciones + feriados
 │   ├── migracion_fase6.py     # sello SHA-256 + cifrado de datos heredados
+│   ├── migracion_fase7.py     # rol Contabilidad (HU-03) + cuenta demo opcional
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a PBKDF2
 ├── tests/
@@ -84,6 +85,7 @@ proyecto_setesa/
 │   ├── test_vacaciones.py     # Saldo de vacaciones
 │   ├── test_validaciones.py   # Reglas de fechas y saldo
 │   ├── test_app_smoke.py
+│   ├── test_rbac_contabilidad.py  # HU-03: panel de solo lectura
 │   └── smoke_test.py          # Prueba E2E manual
 ├── docs/
 │   ├── ESTRUCTURA.md
@@ -206,6 +208,7 @@ La aplicación abre en `http://localhost:8501`.
 | `Consultor` | Formulario + historial | Registra, firma y descarga su solicitud |
 | `Coordinador GTC` | Portal de aprobaciones | Otorga el visto bueno del banco |
 | `Administrador` | Dashboard + vigencia + feriados | Autoriza, consulta métricas, depura usuarios y administra feriados |
+| `Contabilidad` | Repositorio de expedientes (solo lectura) | Consulta, filtra y descarga el PDF final con las tres firmas; no autoriza ni administra |
 
 > Las contraseñas se almacenan con PBKDF2-SHA256. Para crear usuarios, usar el
 > hash generado por `src.core.security.hash_password()`.
@@ -251,6 +254,8 @@ Reglas:
 - Filtros combinables por **nombre**, **estado**, **tipo de incidencia** y
   **rango de fechas** (se conservan las solicitudes cuyo periodo de ausencia se
   solapa con el rango elegido).
+- Panel compartido: **Gerencia** autoriza y firma; **Contabilidad** solo consulta
+  y descarga (HU-03), sin acceso a Vigencia ni Feriados.
 - KPIs: total, ingresadas, pendientes de coordinador, pendientes de gerencia y
   finalizadas; distribución por estado y por tipo.
 - Alertas in-app con el número de expedientes pendientes de firma.
@@ -335,6 +340,8 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
   hábiles.
 - `tests/test_app_smoke.py` incluye el rechazo de login de un usuario inactivo
   (QA-01).
+- `tests/test_rbac_contabilidad.py` verifica que Contabilidad solo consulte y
+  descargue, sin autorizar ni acceder a Vigencia/Feriados (HU-03).
 - `tests/test_utils_firma.py` verifica nombres temporales únicos y limpieza.
 - El smoke test crea y elimina sus propios registros; no deja datos de prueba.
 
@@ -349,6 +356,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 | `scripts/migracion_fase3.py` | Crea `vigencia_log` y sus restricciones |
 | `scripts/migracion_fase5.py` | Agrega el saldo de vacaciones y el catálogo de feriados |
 | `scripts/migracion_fase6.py` | Agrega columnas de sello; con `--cifrar-existentes` cifra datos heredados |
+| `scripts/migracion_fase7.py` | Crea el rol Contabilidad; con `--usuario-demo` añade la cuenta de prueba (HU-03) |
 | `scripts/vigencia_semestral.py` | Ejecuta la baja lógica si venció el semestre (`--forzar` para pruebas) |
 | `scripts/hash_passwords.py` | Convierte contraseñas heredadas a PBKDF2 |
 
@@ -384,11 +392,11 @@ Fases completadas: **0 (línea base)**, **1 (coherencia del workflow)**,
 **2 (firmas completas)**, **3 (vigencia robusta: baja lógica auditable,
 ejecución semestral y reactivación)**, **4 (dashboard completo: filtros, KPIs,
 alertas, descarga del PDF final y exportación CSV)**, **5 (saldo de vacaciones,
-feriados administrables, validaciones de servidor y jefe GTC desde usuarios)** y
+feriados administrables, validaciones de servidor y jefe GTC desde usuarios)**,
 **6 (RNF: cifrado Fernet, sello SHA-256, SQLAlchemy, logging, CI y guía de
-despliegue)**.
+despliegue)** y **7 (rol Contabilidad de solo lectura, HU-03)**.
 
-Cierre actual de calidad: **93 pruebas pytest** y **57/57** checks del smoke test,
+Cierre actual de calidad: **97 pruebas pytest** y **57/57** checks del smoke test,
 sin datos de prueba residuales en la base. El workflow de GitHub Actions compila
 y ejecuta la suite en cada push a `main`.
 

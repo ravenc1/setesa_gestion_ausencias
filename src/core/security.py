@@ -9,6 +9,11 @@ import streamlit as st
 ALGORITHM = "pbkdf2_sha256"
 ITERATIONS = 240000
 
+# HU-03: Gerencia y Contabilidad comparten el repositorio de expedientes, pero
+# Contabilidad solo consulta y descarga; no autoriza ni administra catálogos.
+ROL_CONTABILIDAD = "Contabilidad"
+ROLES_PANEL = ("Administrador", ROL_CONTABILIDAD)
+
 
 def hash_password(password):
     """Genera un hash PBKDF2-SHA256 con sal aleatoria."""
@@ -52,3 +57,8 @@ def verify_or_upgrade(password, stored):
 def rol_autorizado(roles):
     """RBAC: valida que el rol en sesión esté dentro de los roles permitidos."""
     return st.session_state.get("rol") in roles
+
+
+def es_solo_lectura():
+    """Indica si el rol en sesión solo puede consultar y descargar."""
+    return st.session_state.get("rol") == ROL_CONTABILIDAD
