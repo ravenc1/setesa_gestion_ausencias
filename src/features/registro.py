@@ -16,6 +16,13 @@ from src.core.utils import calcular_dias_habiles
 from src.core.vacaciones import TIPO_VACACION, obtener_saldo_vacaciones
 from src.core.validaciones import ValidacionError
 from src.core.solicitudes import registrar_solicitud, obtener_historial
+from src.core.recordatorios import (
+    RecordatorioError,
+    construir_enlace_correo,
+    registrar_recordatorio,
+    ultimo_recordatorio,
+)
+from src.core.workflow import ESTADO_PENDIENTE_FIRMA_COORDINADOR
 
 logger = obtener_logger("setesa.registro")
 
@@ -261,6 +268,77 @@ def mostrar_formulario():
                 else:
                     with open(pdf_historial, "rb") as f:
                         st.download_button(f"📥 Descargar Expediente #{id_descarga} ({fila['estado_workflow']})", data=f, file_name=f"Expediente_{id_descarga}.pdf", mime="application/pdf", type="primary")
+
+            # R-11: aviso auditable al Coordinador GTC del banco.
+            st.write("---")
+            st.markdown("#### 🔔 Recordatorio al banco")
+            if fila["estado_workflow"] != ESTADO_PENDIENTE_FIRMA_COORDINADOR:
+                st.caption(
+                    "El recordatorio solo está disponible cuando el expediente "
+                    "espera el visto bueno del Coordinador GTC."
+                )
+            else:
+                ultimo = ultimo_recordatorio(id_descarga)
+                if ultimo:
+                    estado_envio = "atendido" if ultimo["atendido"] else "pendiente"
+                    st.caption(
+                        "Último recordatorio enviado el "
+                        f"{ultimo['fecha']:%d/%m/%Y %H:%M} ({estado_envio})."
+                    )
+
+                mensaje_default = (
+                    f"Estimado Coordinador GTC: el expediente #{id_descarga} "
+                    f"({fila['tipo_ausencia']}, del "
+                    f"{fila['fecha_inicio']:%d/%m/%Y} al "
+                    f"{fila['fecha_fin']:%d/%m/%Y}) está pendiente de su visto "
+                    "bueno en la plataforma SETESA. Agradecemos su gestión."
+                )
+                with st.form(f"form_recordatorio_{id_descarga}"):
+                    mensaje = st.text_area(
+                        "Mensaje para el Coordinador GTC",
+                        value=mensaje_default,
+                        height=100,
+                    )
+                    enviar = st.form_submit_button(
+                        "🔔 Recordar al banco", type="primary"
+                    )
+
+                if enviar:
+                    try:
+                        envio = registrar_recordatorio(
+                            id_descarga,
+                            st.session_state["id_usuario"],
+                            mensaje,
+                        )
+                    except RecordatorioError as e:
+                        st.warning(f"⚠️ {e}")
+                    except Exception as e:
+                        logger.exception("Error al registrar el recordatorio")
+                        st.error(f"No se pudo registrar el recordatorio: {e}")
+                    else:
+                        st.success(
+                            "Recordatorio registrado. El Coordinador GTC lo "
+                            "verá en su bandeja de entrada."
+                        )
+                        asunto = (
+                            f"Recordatorio: expediente #{id_descarga} pendiente "
+                            "de visto bueno"
+                        )
+                        cuerpo = (
+                            f"{envio['mensaje']}\n\n"
+                            f"Consultor: {st.session_state.get('nombre', '')}\n"
+                            f"Expediente: #{id_descarga}"
+                        )
+                        st.link_button(
+                            "✉️ Abrir correo para el Coordinador GTC",
+                            construir_enlace_correo(
+                                envio["correo"], asunto, cuerpo
+                            ),
+                        )
+                        st.caption(
+                            f"Destinatario: {envio['destinatario']} "
+                            f"<{envio['correo']}>"
+                        )
 
             with st.expander(f"🕓 Historial de estados del expediente #{id_descarga}"):
                 df_movimientos = obtener_historial(id_descarga)

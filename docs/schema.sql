@@ -99,6 +99,25 @@ CREATE TABLE IF NOT EXISTS solicitud_historial (
 );
 
 -- ---------------------------------------------------------------------------
+-- Recordatorios del consultor al Coordinador GTC (R-11)
+--   El canal principal es la bandeja del Coordinador; el correo registrado se
+--   guarda como copia histórica para el enlace mailto.
+--   El mensaje se almacena cifrado con Fernet (RNF-01).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS recordatorio (
+    id_recordatorio SERIAL PRIMARY KEY,
+    id_solicitud    INTEGER NOT NULL
+                        REFERENCES solicitud(id_solicitud) ON DELETE CASCADE,
+    id_emisor       INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    id_destinatario INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    correo_destino  VARCHAR(150),
+    mensaje         TEXT,
+    fecha           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atendido        BOOLEAN NOT NULL DEFAULT FALSE,
+    fecha_atencion  TIMESTAMP
+);
+
+-- ---------------------------------------------------------------------------
 -- Auditoría del algoritmo de vigencia (RF-05 / CU-06)
 --   Guarda cada depuración y cada reactivación, con su ejecutor.
 -- ---------------------------------------------------------------------------
@@ -132,6 +151,12 @@ CREATE INDEX IF NOT EXISTS idx_solicitud_estado_fecha
 
 CREATE INDEX IF NOT EXISTS idx_historial_solicitud
     ON solicitud_historial (id_solicitud, fecha);
+
+CREATE INDEX IF NOT EXISTS idx_recordatorio_destino
+    ON recordatorio (id_destinatario, atendido, fecha DESC);
+
+CREATE INDEX IF NOT EXISTS idx_recordatorio_solicitud
+    ON recordatorio (id_solicitud, fecha DESC);
 
 CREATE INDEX IF NOT EXISTS idx_vigencia_log_fecha
     ON vigencia_log (fecha_ejecucion DESC);

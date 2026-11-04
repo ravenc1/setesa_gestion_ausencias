@@ -36,6 +36,7 @@ proyecto_setesa/
 │   │   ├── vacaciones.py      # Saldo asignado − usado (RF-01 / D-03)
 │   │   ├── validaciones.py    # Reglas de fechas y saldo en servidor
 │   │   ├── usuarios.py        # Usuarios por rol (jefe GTC)
+│   │   ├── recordatorios.py   # Recordatorios al Coordinador GTC (R-11)
 │   │   ├── utils.py           # Lógica pura (calcular_dias_habiles)
 │   │   └── config.py          # Rutas y variables (.env o st.secrets)
 │   ├── features/              # Módulos funcionales por rol
@@ -56,6 +57,7 @@ proyecto_setesa/
 │   ├── migracion_fase5.py     # saldo de vacaciones + catálogo de feriados
 │   ├── migracion_fase6.py     # sello SHA-256 + cifrado de datos heredados
 │   ├── migracion_fase7.py     # rol Contabilidad (HU-03) + cuenta demo
+│   ├── migracion_fase8.py     # tabla recordatorio (R-11)
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a hash
 │
@@ -76,6 +78,7 @@ proyecto_setesa/
 │   ├── test_validaciones.py   # Reglas de fechas y saldo
 │   ├── test_app_smoke.py      # Renderizado con AppTest + login inactivo
 │   ├── test_rbac_contabilidad.py  # HU-03: panel de solo lectura
+│   ├── test_recordatorios.py      # R-11: envío, cooldown y atención
 │   └── smoke_test.py          # Prueba E2E manual (rollback/limpieza)
 │
 ├── docs/
@@ -249,13 +252,28 @@ ambas en los secrets de Streamlit). La guía completa está en
 - Cubierto por `tests/smoke_test.py`, `test_solicitudes_integration.py` y
   `test_app_smoke.py`.
 
+## Módulo Recordatorios (R-11)
+
+- `recordatorios.py` registra el aviso del consultor al Coordinador GTC en la
+  tabla `recordatorio`. No cambia el estado del workflow.
+- Solo el consultor dueño del expediente puede enviarlo y solo mientras está en
+  `Pendiente de Firma Coordinador`; hay un cooldown de 24 h.
+- El destinatario se resuelve por el nombre de `solicitud.jefe_gtc` entre los
+  usuarios vigentes con rol `Coordinador GTC`; si no coincide, se usa el primer
+  coordinador activo.
+- `construir_enlace_correo` arma el `mailto:` con asunto y cuerpo codificados.
+- Al firmar el banco, `solicitudes.cambiar_estado` marca los recordatorios como
+  atendidos en la misma transacción.
+- Cubierto por `tests/test_recordatorios.py` (7 pruebas).
+
 ## Pendientes conocidos
 
-- **R-11**: recordatorio al banco (diferido; sin correo institucional).
 - **D-06**: rechazo/devolución con motivo (diferido; fuera del alcance acordado).
 - **Gestión de usuarios**: alta/edición/reseteo desde el panel (siguiente mejora).
+- **Endurecimiento del login**: límite de intentos y bloqueo temporal (mejora).
 
 **Cerrado en la Fase 7:** D-02 (rol Contabilidad de solo lectura, HU-03).
+**Cerrado en la Fase 8:** R-11 (recordatorio al banco con bandeja y `mailto:`).
 
 **Nota documental:** el documento de tesis quedó cerrado el 04/11/2026; las
 mejoras posteriores se registran solo en este repositorio y no modifican el PDF.

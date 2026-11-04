@@ -10,6 +10,7 @@ from src.core.workflow import (
     ESTADO_PENDIENTE_FIRMA_COORDINADOR,
 )
 from src.core.security import rol_autorizado
+from src.core.recordatorios import obtener_recordatorios_pendientes
 from src.core.solicitudes import (
     FirmaRequerida,
     TransicionInvalida,
@@ -81,6 +82,18 @@ def mostrar_panel_coordinador():
     )
 
     df_pendientes = obtener_solicitudes_pendientes()
+
+    # R-11: recordatorios que los consultores enviaron a este coordinador.
+    df_recordatorios = obtener_recordatorios_pendientes(
+        st.session_state.get("id_usuario")
+    )
+    if not df_recordatorios.empty:
+        st.warning(
+            f"🔔 Tiene {len(df_recordatorios)} recordatorio(s) de consultores "
+            "esperando su visto bueno."
+        )
+        with st.expander("🔔 Recordatorios recibidos", expanded=True):
+            st.dataframe(df_recordatorios, hide_index=True, width="stretch")
 
     if df_pendientes.empty:
         st.success("Su bandeja está limpia. No hay solicitudes pendientes de revisión.")

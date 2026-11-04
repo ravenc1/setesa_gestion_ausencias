@@ -1,9 +1,10 @@
 # Checklist de Avance y Plan de Continuación — Proyecto SETESA
 
 > **Documento de trabajo** elaborado a partir de la lectura completa de
-> `proyecto_doc/PG2 - Proyecto SETESA.pdf` (211 páginas) y de la inspección del
-> código, la base de datos PostgreSQL (Supabase) y las pruebas existentes.
-> Fecha de corte: **27/10/2026**.
+> `proyecto_doc/Proyecto de Graduación II - Proyecto SETESA - Ricardo Arias.pdf`
+> (220 páginas) y de la inspección del código, la base de datos PostgreSQL
+> (Supabase) y las pruebas existentes.
+> Fecha de corte: **04/11/2026**.
 >
 > Este archivo es la guía viva para continuar el desarrollo. Se actualiza al
 > cerrar cada fase.
@@ -38,8 +39,9 @@ están cerrados:**
    verificado desde el dashboard.
 
 **Conclusión:** el sistema está **100 % funcional** y con los RNF verificables
-cubiertos. Quedan únicamente decisiones diferidas (D-06, R-11) y la
-transcripción del estado final a las tablas 25–27 del documento de tesis.
+cubiertos. Quedan únicamente **D-06** (rechazo/devolución, fuera del alcance) y
+las mejoras adicionales de gestión de usuarios y endurecimiento del login, que
+no forman parte del alcance mínimo de la tesis.
 
 ### Registro de avance
 
@@ -53,6 +55,7 @@ transcripción del estado final a las tablas 25–27 del documento de tesis.
 | 27/10/2026 | **Fase 5** | Saldo de vacaciones (asignado − usado), catálogo de feriados administrable, validación de fechas y saldo en servidor, jefe GTC desde usuarios. **H-07/H-16/H-17/H-18 y D-03/D-04 cerrados.** |
 | 27/10/2026 | **Fase 6** | Cifrado Fernet, sello SHA-256, SQLAlchemy, logging rotativo, CI y guía de despliegue. **H-11/H-13/H-19/H-20/H-21/H-23 y D-05 cerrados.** |
 | 04/11/2026 | **Fase 7** | Rol **Contabilidad** de solo lectura (HU-03): panel propio, filtros, trazabilidad y descarga del PDF final, sin autorización ni administración. **D-02 cerrado.** |
+| 04/11/2026 | **Fase 8** | Recordatorio auditable del consultor al Coordinador GTC (R-11): botón en el historial, bandeja de recordatorios, enlace de correo `mailto` y cooldown de 24 h. **R-11 cerrado.** |
 
 **Evidencias:** `docs/evidencias/2026-10-27_fase0-1.md`,
 `docs/evidencias/2026-10-27_fase2.md`,
@@ -60,15 +63,16 @@ transcripción del estado final a las tablas 25–27 del documento de tesis.
 `docs/evidencias/2026-10-27_fase4.md`,
 `docs/evidencias/2026-10-27_fase5.md` y
 `docs/evidencias/2026-10-27_fase6.md`; **Fase 7** en
-`docs/evidencias/2026-11-04_fase7.md`.
-**Pruebas al cierre:** `pytest` 97/97 y smoke test 57/57, sin datos de prueba
+`docs/evidencias/2026-11-04_fase7.md` y **Fase 8** en
+`docs/evidencias/2026-11-04_fase8.md`.
+**Pruebas al cierre:** `pytest` 104/104 y smoke test 57/57, sin datos de prueba
 residuales en la base.
 
 **Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-07, H-08, H-09,
 H-10, H-11, H-12, H-13, H-14, H-15, H-16, H-17, H-18, H-19, H-20, H-21, H-22,
-H-23 y D-01, D-03, D-04, D-05.
-**Hallazgos que siguen abiertos:** solo los diferidos R-11 (recordatorio al
-banco) y D-06 (rechazo/devolución).
+H-23, D-01, D-02, D-03, D-04, D-05 y R-11.
+**Hallazgos que siguen abiertos:** solo D-06 (rechazo/devolución, fuera del
+alcance acordado).
 
 ---
 
@@ -155,7 +159,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | N-07 | RBAC por módulo | ✅ | `rol_autorizado()` + revalidación de vigencia en cada rerun (`app.py`) | — |
 | N-08 | **Esquema SQL versionado** | ✅ | `docs/schema.sql` validado en esquema temporal | — |
 | N-09 | README de instalación/ejecución | ✅ | `README.md` | — |
-| N-10 | Pruebas automatizadas (pytest) | ✅ | 93 pruebas (unitarias, integración, PDF, cifrado, vigencia, reportes, feriados, vacaciones y AppTest) | — |
+| N-10 | Pruebas automatizadas (pytest) | ✅ | 104 pruebas (unitarias, integración, PDF, cifrado, vigencia, reportes, feriados, vacaciones, recordatorios y AppTest) | — |
 | N-11 | Advertencia `pd.read_sql_query` | ✅ | Lecturas migradas a `get_engine()` (SQLAlchemy) | H-21 |
 | N-12 | Limpieza de firmas temporales | ✅ | `utils_firma.eliminar_archivo` + `finally` en el motor; verificado por `test_documentos` | — |
 | N-13 | Logging de errores | ✅ | Logger rotativo `setesa` en `storage/logs/setesa.log` | H-23 |
@@ -187,7 +191,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | R-08 | Estado inicial según tesis | ✅ | Opción C: `Ingresada` → `Pendiente de Firma Coordinador` en la misma transacción | — |
 | R-09 | Validar `fecha_fin >= fecha_inicio` | ✅ | Validación en UI y en `validaciones.validar_fechas` (servidor) |
 | R-10 | Guardar `ruta_pdf` | ✅ | `services/documentos.py` actualiza la columna tras cada generación |
-| R-11 | Alertas/recordatorios al banco | 🔴 | Diseño (Tabla 9) lo menciona; no implementado |
+| R-11 | Alertas/recordatorios al banco | ✅ | **Fase 8**: botón en el historial, tabla `recordatorio`, bandeja del Coordinador, enlace `mailto` y cooldown de 24 h | — |
 | R-12 | Seleccionar jefe GTC desde usuarios | ✅ | `selectbox` con los usuarios vigentes del rol Coordinador GTC |
 | R-13 | Feriados de Guatemala | ✅ | Catálogo `feriado` administrable desde Gerencia |
 
@@ -210,7 +214,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 
 | # | Ítem | Estado | Detalle |
 |---|---|---|---|
-| C-01 | Bandeja de solicitudes | ✅ | Filtra por `Ingresada`, orden FIFO |
+| C-01 | Bandeja de solicitudes | ✅ | Filtra por `Pendiente de Firma Coordinador`, orden FIFO |
 | C-02 | Transición a “Pendiente de Aprobación Gerencia” | ✅ | `UPDATE` + `commit` |
 | C-03 | **Canvas de firma del coordinador** | ✅ | `st_canvas` obligatorio antes de aprobar |
 | C-04 | **Persistir `firma_jefe_gtc`** | ✅ | `cambiar_estado(..., firma_b64=...)` en la misma transacción |
@@ -219,6 +223,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | C-07 | Asignación por equipo/coordinador | 🔧 | Ve todas las solicitudes, no solo “las de su equipo” |
 | C-08 | Rechazo / devolución con motivo | 🔴 | No definido en la tesis; decidir D-06 |
 | C-09 | Evidencia de auditoría | ✅ | `solicitud_historial` registra actor, fecha y observación | — |
+| C-10 | Bandeja de recordatorios | ✅ | **R-11**: aviso y tabla de recordatorios pendientes; se marcan atendidos al firmar | — |
 
 ### 4.6 Módulo `dashboard.py` (RF-04 / HU-03 / QA-04)
 
@@ -312,7 +317,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | PR-05 | Baja lógica | Completado | ✅ `vigencia_log`, salvaguarda, reactivación y expulsión de sesión | — |
 | PR-06 | Firma incrustada | En proceso | ✅ Completado: 3 firmas capturadas, persistidas y estampadas | — |
 
-**Cobertura automatizada actual:** 97 pruebas pytest + 57 checks del smoke test.
+**Cobertura automatizada actual:** 104 pruebas pytest + 57 checks del smoke test.
 Cubren: días hábiles con feriados, seguridad, transiciones válidas/inválidas,
 historial, firma obligatoria y persistida, PDF con 3 imágenes, `ruta_pdf`,
 limpieza de temporales, integración contra BD real, render de los 3 paneles,
@@ -470,13 +475,13 @@ PDF; rol Contabilidad completado en Fase 7).
 - [x] **H-16** Validar `fecha_fin >= fecha_inicio` en servidor y corregir mensajes.
 - [x] **H-17/D-04** Descontar feriados de Guatemala (catálogo administrable).
 - [x] **H-18** Seleccionar al jefe GTC desde los usuarios con rol Coordinador.
-- [ ] **R-11** Recordatorio al banco (registro de alerta o enlace `mailto`). Diferido.
+- [x] **R-11** Recordatorio al banco (cerrado en la Fase 8: tabla `recordatorio`, bandeja del Coordinador y enlace `mailto`).
 - [x] Pruebas: saldo correcto tras varias solicitudes; fechas inválidas rechazadas; feriado descontado.
 
 **Criterio de aceptación:** RF-01 se cumple de punta a punta y las validaciones
 no permiten datos imposibles. ✅ **Cumplido al cierre de Fase 5** (83 pruebas,
-52 checks y `test_vacaciones`/`test_feriados` con datos temporales; R-11
-diferido).
+52 checks y `test_vacaciones`/`test_feriados` con datos temporales; R-11 se
+cerró después, en la Fase 8).
 
 ### Fase 6 — RNF, cierre y documentación (1.5 días) · P1/P2
 
@@ -486,7 +491,7 @@ diferido).
 - [x] **H-23** Logging centralizado.
 - [x] **H-19** Suite de pruebas completa (unitaria + integración + E2E) y CI.
 - [x] **H-20** README, `docs/ESTRUCTURA.md`, `docs/DESPLIEGUE.md` y evidencias.
-- [x] Regresión completa QA-01…QA-06 y PR-01…PR-06 (97 pytest + 57 smoke).
+- [x] Regresión completa QA-01…QA-06 y PR-01…PR-06 (104 pytest + 57 smoke).
 - [ ] Transcribir el estado final a las tablas 25, 26 y 27 del PDF de la tesis.
 
 **Criterio de aceptación:** 6/6 QA y 6/6 PR con evidencia; documentación
@@ -505,6 +510,21 @@ tarea documental del autor; el mapeo está en la evidencia de Fase 6).
 **Criterio de aceptación:** un usuario con rol Contabilidad entra a su panel,
 consulta y descarga expedientes finalizados y **no** puede autorizar, firmar ni
 administrar catálogos. ✅ **Cumplido.**
+
+### Fase 8 — Recordatorio al banco (0.5 día) · cierra R-11
+
+- [x] **R-11** Botón «Recordar al banco» en el historial del consultor, solo para expedientes en `Pendiente de Firma Coordinador`.
+- [x] **Auditoría** Tabla `recordatorio` con emisor, destinatario, correo histórico, mensaje, fecha y estado de atención.
+- [x] **Bandeja del Coordinador** Aviso con contador y tabla de recordatorios pendientes.
+- [x] **Correo** Enlace `mailto:` con asunto y cuerpo prellenados hacia el correo registrado del coordinador (sin SMTP).
+- [x] **Cooldown** Un recordatorio por expediente cada 24 h para evitar duplicados.
+- [x] **Atención automática** La firma del Coordinador marca los recordatorios como atendidos en la misma transacción.
+- [x] **Migración** `scripts/migracion_fase8.py` idempotente y prueba `tests/test_recordatorios.py`.
+- [x] Documentación: README, checklist y evidencia `docs/evidencias/2026-11-04_fase8.md`.
+
+**Criterio de aceptación:** el consultor envía un recordatorio desde su
+historial, el Coordinador GTC lo ve en su bandeja y, al firmar, el recordatorio
+queda atendido. ✅ **Cumplido.**
 
 ---
 
@@ -538,7 +558,7 @@ Una tarea se considera cerrada solo si:
 | Área | Cumplimiento estimado | Estado |
 |---|---|---|
 | Autenticación / RBAC | 100 % | 🟢 |
-| Registro de solicitudes | 98 % | 🟢 |
+| Registro de solicitudes | 100 % | 🟢 |
 | Motor PDF | 90 % | 🟢 |
 | Workflow / trazabilidad | 90 % | 🟢 |
 | Firmas (3 roles) | 95 % | 🟢 |
@@ -550,14 +570,15 @@ Una tarea se considera cerrada solo si:
 | Documentación técnica | 100 % | 🟢 |
 | **Total ponderado** | **~99 %** | 🟢 |
 
-El 1 % restante corresponde a R-11 (recordatorio al banco) y a D-06
-(rechazo/devolución, fuera de alcance).
+El 1 % restante corresponde a D-06 (rechazo/devolución, fuera de alcance). La
+gestión de usuarios desde el panel y el endurecimiento del login son mejoras
+adicionales, no requisitos pendientes de la tesis.
 
 ---
 
 ## 12. Próximo paso recomendado
 
-Las fases 0–7 están cerradas. Para la entrega y defensa:
+Las fases 0–8 están cerradas. Para la entrega y defensa:
 
 1. ~~Transcribir a las tablas 25, 26 y 27 del PDF de la tesis el estado final~~
    **No aplica:** el documento de tesis quedó cerrado el 04/11/2026 y no se
@@ -565,14 +586,14 @@ Las fases 0–7 están cerradas. Para la entrega y defensa:
 2. Preparar la demostración: login por rol (incluido **Contabilidad**), registro
    con firma, aprobación GTC, autorización de Gerencia, descarga del PDF sellado
    y verificación SHA-256.
-3. Mostrar la evidencia de calidad: 97 pruebas pytest, 57 checks E2E y CI en
+3. Mostrar la evidencia de calidad: 104 pruebas pytest, 57 checks E2E y CI en
    GitHub Actions.
 4. Confirmar la custodia de `FERNET_KEY` y el respaldo de Supabase antes de la
    presentación.
-5. Siguiente mejora acordada: **R-11** (recordatorio al banco) y, después,
-   gestión de usuarios desde el panel de Gerencia.
+5. Siguiente mejora acordada: **gestión de usuarios desde el panel de Gerencia**
+   (alta, edición, activación/desactivación y reseteo de contraseña).
 
-Con las Fases 0–6 cerradas, el proyecto queda listo para la defensa con evidencia
+Con las Fases 0–8 cerradas, el proyecto queda listo para la defensa con evidencia
 de QA y RNF verificables.
 
 ---

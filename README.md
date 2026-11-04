@@ -49,6 +49,7 @@ proyecto_setesa/
 │   │   ├── vacaciones.py      # Saldo de vacaciones
 │   │   ├── validaciones.py    # Reglas de fechas y saldo
 │   │   ├── usuarios.py        # Usuarios por rol
+│   │   ├── recordatorios.py   # Recordatorios al banco (R-11)
 │   │   ├── utils.py           # Días hábiles
 │   │   └── config.py          # Rutas y variables de entorno/secrets
 │   ├── features/
@@ -68,6 +69,7 @@ proyecto_setesa/
 │   ├── migracion_fase5.py     # saldo de vacaciones + feriados
 │   ├── migracion_fase6.py     # sello SHA-256 + cifrado de datos heredados
 │   ├── migracion_fase7.py     # rol Contabilidad (HU-03) + cuenta demo opcional
+│   ├── migracion_fase8.py     # tabla recordatorio (R-11)
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a PBKDF2
 ├── tests/
@@ -146,9 +148,9 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 psql "$env:DATABASE_URL" -f docs/schema.sql
 ```
 
-Crea `rol`, `usuario`, `solicitud`, `solicitud_historial`, `vigencia_log`,
-`feriado`, índices, los tres roles base y la semilla de feriados. Los usuarios se
-crean aparte (ver `scripts/hash_passwords.py`).
+Crea `rol`, `usuario`, `solicitud`, `solicitud_historial`, `recordatorio`,
+`vigencia_log`, `feriado`, índices, los cuatro roles base y la semilla de
+feriados. Los usuarios se crean aparte (ver `scripts/hash_passwords.py`).
 
 ### Opción B — Base existente (recomendado para este repositorio)
 
@@ -167,6 +169,9 @@ crean aparte (ver `scripts/hash_passwords.py`).
 
 # 5. Sello SHA-256 y cifrado de registros heredados (una sola vez)
 .\venv\Scripts\python.exe scripts\migracion_fase6.py --cifrar-existentes
+
+# 6. Recordatorios al banco (R-11)
+.\venv\Scripts\python.exe scripts\migracion_fase8.py
 ```
 
 La migración de la Fase 1:
@@ -191,6 +196,14 @@ La migración de la Fase 6:
 - sella los PDFs existentes que tengan ruta pero no hash.
 - Es idempotente; en ejecuciones posteriores use el script sin el flag.
 
+La migración de la Fase 7:
+- crea el rol `Contabilidad` (idempotente);
+- con `--usuario-demo`, agrega una cuenta de prueba de solo lectura.
+
+La migración de la Fase 8:
+- crea la tabla `recordatorio` y sus índices;
+- no siembra datos: los recordatorios nacen de la operación real.
+
 ---
 
 ## Ejecución
@@ -212,6 +225,12 @@ La aplicación abre en `http://localhost:8501`.
 
 > Las contraseñas se almacenan con PBKDF2-SHA256. Para crear usuarios, usar el
 > hash generado por `src.core.security.hash_password()`.
+>
+> El **correo registrado** es el identificador de acceso y el destino de los
+> recordatorios. Puede ser de SETESA (`@setesagt.com`), del banco (coordinadores
+> GTC) o personal; no se exige un dominio específico. Las cuentas las crea
+> IT/Gerencia, no hay autorregistro, y cada persona debe tener la suya para que
+> su firma sea atribuible.
 
 ---
 
@@ -246,6 +265,26 @@ Reglas:
 - La explicación y las tres firmas se guardan **cifradas con Fernet** en la base;
   se descifran solo al mostrarlas o generar el PDF.
 - Cada login y cada escritura relevante actualizan `usuario.ultima_actividad`.
+
+---
+
+## Recordatorio al banco (R-11)
+
+- El consultor lo envía desde **Mis Solicitudes → Recordatorio al banco**,
+  únicamente mientras el expediente está en `Pendiente de Firma Coordinador`.
+- Se guarda en la tabla `recordatorio` con emisor, destinatario, correo
+  histórico, mensaje, fecha y estado de atención. El mensaje se cifra con Fernet
+  en reposo (RNF-01) y se descifra solo al mostrarlo.
+- El Coordinador GTC ve un aviso con contador y la tabla de recordatorios en su
+  bandeja; al firmar, quedan **atendidos** en la misma transacción.
+- Se ofrece un enlace `mailto:` con asunto y cuerpo prellenados hacia el correo
+  registrado del coordinador. No se envía correo automático: el sistema no
+  depende de un servidor SMTP.
+- **Cooldown de 24 h** por expediente para evitar duplicados.
+- Los coordinadores del banco pueden registrarse con su correo corporativo o
+  personal; el campo `correo_institucional` es el identificador de acceso y el
+  destino de las notificaciones. Las cuentas las crea IT/Gerencia, nunca por
+  autorregistro.
 
 ---
 
@@ -320,7 +359,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 
 - Las pruebas de integración se **omiten** si no hay `DATABASE_URL`.
 - `tests/test_app_smoke.py` usa `AppTest` de Streamlit para verificar que el
-  login y los tres paneles se rendericen sin excepciones.
+  login y los cuatro paneles se rendericen sin excepciones.
 - `tests/test_crypto.py` cubre el ciclo cifrar/descifrar, la no recifra, los
   valores heredados en claro y el rechazo con una clave distinta.
 - `tests/test_documentos.py` verifica que el PDF final tenga las tres firmas,
@@ -342,6 +381,8 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
   (QA-01).
 - `tests/test_rbac_contabilidad.py` verifica que Contabilidad solo consulte y
   descargue, sin autorizar ni acceder a Vigencia/Feriados (HU-03).
+- `tests/test_recordatorios.py` cubre el envío al banco, el cooldown, la
+  propiedad del expediente, el estado permitido y la atención al firmar (R-11).
 - `tests/test_utils_firma.py` verifica nombres temporales únicos y limpieza.
 - El smoke test crea y elimina sus propios registros; no deja datos de prueba.
 
@@ -357,6 +398,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 | `scripts/migracion_fase5.py` | Agrega el saldo de vacaciones y el catálogo de feriados |
 | `scripts/migracion_fase6.py` | Agrega columnas de sello; con `--cifrar-existentes` cifra datos heredados |
 | `scripts/migracion_fase7.py` | Crea el rol Contabilidad; con `--usuario-demo` añade la cuenta de prueba (HU-03) |
+| `scripts/migracion_fase8.py` | Crea la tabla `recordatorio` y sus índices (R-11) |
 | `scripts/vigencia_semestral.py` | Ejecuta la baja lógica si venció el semestre (`--forzar` para pruebas) |
 | `scripts/hash_passwords.py` | Convierte contraseñas heredadas a PBKDF2 |
 
@@ -394,9 +436,10 @@ ejecución semestral y reactivación)**, **4 (dashboard completo: filtros, KPIs,
 alertas, descarga del PDF final y exportación CSV)**, **5 (saldo de vacaciones,
 feriados administrables, validaciones de servidor y jefe GTC desde usuarios)**,
 **6 (RNF: cifrado Fernet, sello SHA-256, SQLAlchemy, logging, CI y guía de
-despliegue)** y **7 (rol Contabilidad de solo lectura, HU-03)**.
+despliegue)**, **7 (rol Contabilidad de solo lectura, HU-03)** y **8
+(recordatorio auditable al banco, R-11)**.
 
-Cierre actual de calidad: **97 pruebas pytest** y **57/57** checks del smoke test,
+Cierre actual de calidad: **104 pruebas pytest** y **57/57** checks del smoke test,
 sin datos de prueba residuales en la base. El workflow de GitHub Actions compila
 y ejecuta la suite en cada push a `main`.
 

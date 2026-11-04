@@ -11,6 +11,7 @@ from src.core.crypto import cifrar, descifrar_campos
 from src.core.database import get_connection, get_engine
 from src.core.feriados import fechas_feriados
 from src.core.logging_config import obtener_logger
+from src.core.recordatorios import marcar_atendidos
 from src.core.utils import calcular_dias_habiles
 from src.core.validaciones import (
     ValidacionError,
@@ -261,6 +262,11 @@ def cambiar_estado(
                     id_usuario,
                     observacion,
                 )
+
+                # R-11: la firma del banco atiende los recordatorios pendientes
+                # del expediente dentro de la misma transacción.
+                if estado_nuevo == ESTADO_PENDIENTE_APROBACION_GERENCIA:
+                    marcar_atendidos(cursor, id_solicitud)
 
                 # H-01: firmar/aprobar también cuenta como actividad.
                 marcar_actividad(cursor, id_usuario)

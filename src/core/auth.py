@@ -66,7 +66,13 @@ def show_login():
     
     with col2:
         with st.form("login_form"):
-            email = st.text_input("Correo Institucional")
+            email = st.text_input(
+                "Correo registrado",
+                help=(
+                    "Correo con el que IT registró su cuenta. Puede ser de "
+                    "SETESA, del banco o personal."
+                ),
+            )
             password = st.text_input("Contraseña", type="password")
             submit_button = st.form_submit_button("Iniciar Sesión", width="stretch")
             
