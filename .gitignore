@@ -27,3 +27,6 @@ docs/_tesis_extraida.txt
 # Entornos de editor
 .vscode/
 .idea/
+
+# Plantilla oficial de SETESA (documento interno; no se publica)
+proyecto_doc/Excel_PlantillaOficial_SETESA/
