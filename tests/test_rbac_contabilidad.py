@@ -214,6 +214,7 @@ def test_gerencia_conserva_pestanas_y_autorizacion():
         at = _sesion("Administrador", fila[0], fila[1])
     assert not at.exception, [e.value for e in at.exception]
     assert any("Panel de Control Gerencial" in m.value for m in at.markdown)
-    # Dashboard, Reasignar Coordinador (Fase 12), Vigencia y Feriados.
-    assert len(at.tabs) == 4
+    # Dashboard, Reasignar Coordinador (Fase 12), Vigencia, Feriados y
+    # Motivos de ausencia (Fase 21).
+    assert len(at.tabs) == 5
     assert any("Gestión de Workflow" in m.value for m in at.markdown)

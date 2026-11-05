@@ -44,6 +44,13 @@ def cur():
             cursor.execute(
                 f"ALTER TABLE solicitud ADD COLUMN IF NOT EXISTS {columna}"
             )
+        # Catálogo de motivos (Fase 21): sin él no se registran solicitudes.
+        from scripts.migracion_fase21 import DDL as DDL_FASE21, sembrar
+
+        for sentencia in DDL_FASE21:
+            cursor.execute(sentencia)
+        sembrar(cursor)
+
         # Tablas de la Fase 18.
         from scripts.migracion_fase18 import DDL as DDL_FASE18
 

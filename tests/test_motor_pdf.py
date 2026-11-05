@@ -117,3 +117,9 @@ def test_denegada_por_el_banco(pdf):
 def test_explicacion_larga_cabe_en_el_recuadro(pdf):
     texto, _ = pdf(explicacion="palabra " * 900)
     assert "texto completo en el sistema" in texto
+
+
+def test_motivo_nuevo_se_marca_como_otros_con_su_nombre(pdf):
+    texto, _ = pdf(tipo_ausencia="PERMISO POR ESTUDIO")
+    assert "(PERMISO POR ESTUDIO)" in texto
+    assert "(X) Tj" in texto  # la casilla de OTROS
