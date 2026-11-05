@@ -8,10 +8,12 @@
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.database import get_connection, get_engine
 from src.core.recordatorios import construir_enlace_correo
 
 
+@lectura(ttl=15)
 def contar_no_leidas(id_usuario):
     conn = get_connection()
     if not conn:
@@ -28,6 +30,7 @@ def contar_no_leidas(id_usuario):
         conn.close()
 
 
+@lectura(ttl=15)
 def listar_notificaciones(id_usuario, limite=100):
     engine = get_engine()
     if engine is None:
@@ -49,6 +52,7 @@ def listar_notificaciones(id_usuario, limite=100):
     )
 
 
+@escritura
 def marcar_leidas(id_usuario, ids=None):
     """Marca como leídas las notificaciones del usuario (todas o ``ids``)."""
     conn = get_connection()

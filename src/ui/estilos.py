@@ -14,7 +14,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from src.core.config import PROJECT_ROOT
+from src.core.config import PROJECT_ROOT, soporte_correo
 
 LOGO = PROJECT_ROOT / "assets" / "logo_setesa.png"
 ICONO = PROJECT_ROOT / "assets" / "icono_setesa.png"
@@ -141,6 +141,9 @@ hr {{ border-color: var(--setesa-borde); }}
   text-align: center; color: #6B7FA3; font-size: .8rem; margin-top: 2.6rem;
   padding-top: 1rem; border-top: 1px solid var(--setesa-borde);
 }}
+.setesa-pie .soporte {{ margin-top: .45rem; line-height: 1.5; }}
+.setesa-pie a {{ color: var(--setesa-azul); font-weight: 600; text-decoration: none; }}
+.setesa-pie a:hover {{ text-decoration: underline; }}
 """
 
 
@@ -178,9 +181,15 @@ def perfil_lateral(nombre, rol):
 
 
 def pie_de_pagina():
+    correo = html.escape(soporte_correo())
     st.markdown(
-        '<div class="setesa-pie">SETESA · Plataforma de Gestión de Ausencias y '
-        "Vigencia</div>",
+        '<div class="setesa-pie">'
+        "<div>SETESA · Plataforma de Gestión de Ausencias y Vigencia</div>"
+        '<div class="soporte">¿No puede iniciar sesión o necesita ayuda con la '
+        "plataforma? Escriba a IT: "
+        f'<a href="mailto:{correo}?subject=Soporte%20plataforma%20SETESA">{correo}</a>'
+        "<br>Solo IT puede restablecer contraseñas y desbloquear accesos.</div>"
+        "</div>",
         unsafe_allow_html=True,
     )
 

@@ -13,6 +13,7 @@
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.catalogos import OPCIONES_AUSENCIA
 from src.core.database import get_connection, get_engine
 from src.core.logging_config import obtener_logger
@@ -38,6 +39,7 @@ def normalizar_nombre(nombre):
     return limpio
 
 
+@lectura(ttl=60)
 def listar_motivos(solo_activos=False):
     engine = get_engine()
     if engine is None:
@@ -76,6 +78,7 @@ def _validar_responsable(cursor, id_ejecutor):
         raise MotivoError("Solo Gerencia puede mantener el catálogo de motivos.")
 
 
+@escritura
 def crear_motivo(id_ejecutor, nombre):
     """Agrega un motivo nuevo (activo). Devuelve su nombre normalizado."""
     nombre = normalizar_nombre(nombre)
@@ -102,6 +105,7 @@ def crear_motivo(id_ejecutor, nombre):
     return nombre
 
 
+@escritura
 def cambiar_estado_motivo(id_ejecutor, id_motivo, activo):
     """Activa o desactiva un motivo. Devuelve su nombre."""
     conn = get_connection()

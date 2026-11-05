@@ -7,6 +7,7 @@
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.crypto import cifrar, descifrar_campos
 from src.core.database import get_connection, get_engine
 from src.core.evidencias import evidencia_obligatoria, insertar_evidencias
@@ -120,6 +121,7 @@ def _coordinador_vigente(cursor, id_coordinador):
     return fila[0] if fila else None
 
 
+@escritura
 def registrar_solicitud(
     id_usuario,
     tipo_ausencia,
@@ -262,6 +264,7 @@ def registrar_solicitud(
         conn.close()
 
 
+@escritura
 def cambiar_estado(
     id_solicitud, estado_nuevo, id_usuario, observacion=None, firma_b64=None
 ):
@@ -393,6 +396,7 @@ _TEXTO_DENEGACION = {
 MOTIVO_MIN = 10
 
 
+@escritura
 def denegar_solicitud(id_solicitud, id_usuario, motivo, firma_b64):
     """Deniega el expediente y cierra el flujo (Fase 16).
 
@@ -523,6 +527,7 @@ def obtener_solicitud(id_solicitud):
         conn.close()
 
 
+@escritura
 def actualizar_ruta_pdf(id_solicitud, ruta_pdf):
     """Guarda en la solicitud la ruta del último PDF oficial generado."""
     conn = get_connection()
@@ -540,6 +545,7 @@ def actualizar_ruta_pdf(id_solicitud, ruta_pdf):
         conn.close()
 
 
+@escritura
 def registrar_pdf(id_solicitud, clave, pdf_hash, final=False):
     """Guarda la clave del PDF en el repositorio y su sello (Fase 17).
 
@@ -566,6 +572,7 @@ def registrar_pdf(id_solicitud, clave, pdf_hash, final=False):
         conn.close()
 
 
+@escritura
 def actualizar_hash_pdf(id_solicitud, pdf_hash):
     """Persiste el sello SHA-256 del PDF oficial (H-13)."""
     conn = get_connection()
@@ -604,6 +611,7 @@ def obtener_estado(id_solicitud):
         conn.close()
 
 
+@lectura(ttl=15)
 def obtener_historial(id_solicitud):
     """Devuelve el historial de estados de una solicitud como DataFrame."""
     engine = get_engine()

@@ -4,6 +4,7 @@ import streamlit as st
 from src.core.database import get_connection
 from src.core.logging_config import obtener_logger
 from src.core import intentos, sesion
+from src.core.cuenta import requiere_cambio
 from src.core.security import hash_password, verify_or_upgrade, verify_password
 from src.core.vigencia import ejecutar_si_corresponde, marcar_actividad
 
@@ -115,12 +116,14 @@ def show_login():
             submit_button = st.form_submit_button("Iniciar Sesión", type="primary", width="stretch")
             
             if submit_button:
+                bloqueado = False
+                user_data = None
                 try:
                     user_data = login_user(email, password)
                 except intentos.CuentaBloqueada as e:
+                    bloqueado = True
                     st.error(f"🔒 {e}")
-                    return
-                
+
                 if user_data:
                     id_usuario, nombre, estado_vigencia, rol = user_data
                     
@@ -135,6 +138,8 @@ def show_login():
                         st.session_state['id_usuario'] = id_usuario
                         st.session_state['nombre'] = nombre
                         st.session_state['rol'] = rol
+                        # Fase 24: contraseña temporal entregada por IT.
+                        st.session_state['debe_cambiar_password'] = requiere_cambio(id_usuario)
 
                         # V-07: verificación semestral automática al entrar Gerencia.
                         if rol == "Administrador":
@@ -154,9 +159,11 @@ def show_login():
 
                         st.success(f"Bienvenido {nombre}.")
                         st.rerun()
-                else:
+                elif not bloqueado:
                     st.error(
                         "Credenciales incorrectas. Tras "
                         f"{intentos.MAX_INTENTOS} intentos fallidos el acceso se "
                         f"bloquea {intentos.MINUTOS_BLOQUEO} minutos."
                     )
+
+    estilos.pie_de_pagina()

@@ -13,6 +13,7 @@
 
 import datetime
 
+from src.core.cache import lectura
 from src.core.config import obtener_variable
 from src.core.database import get_connection
 from src.core.logging_config import obtener_logger
@@ -198,6 +199,7 @@ def enviar_recordatorios(simular=False, hoy=None, enviar=enviar_correo):
     return resumen
 
 
+@lectura(ttl=30)
 def ultimos_avisos(limite=50):
     """Últimos correos de recordatorio, para el panel de IT."""
     from src.core.database import get_engine

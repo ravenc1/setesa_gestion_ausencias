@@ -3,6 +3,7 @@
 import streamlit as st
 import datetime
 import pandas as pd
+from src.core.cache import lectura
 from src.services.utils_firma import canvas_to_base64
 from src.core.crypto import descifrar_dataframe
 from src.core.database import get_engine
@@ -54,17 +55,18 @@ def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, id_coordinador, puest
         st.error(f"Error BD: {e}")
         return None
 
+@lectura(ttl=15)
 def obtener_mis_solicitudes(id_usuario):
     engine = get_engine()
     if engine is None:
         return pd.DataFrame()
 
-    # Se agregaron las columnas de firma al SELECT para poder inyectarlas en el PDF histórico.
+    # Fase 24: sin las firmas (imágenes grandes y cifradas): el PDF se arma aparte
+    # desde la base y la tabla no las muestra.
     query = """
         SELECT id_solicitud, fecha_creacion, tipo_ausencia, fecha_inicio, fecha_fin,
                dias_solicitados, estado_workflow, resolucion, motivo_resolucion,
-               jefe_gtc, puesto, codigo_empleado,
-               explicacion, firma_empleado, firma_jefe_gtc, firma_gerencia
+               jefe_gtc, puesto, codigo_empleado, explicacion
         FROM solicitud
         WHERE id_usuario = %s ORDER BY fecha_creacion DESC
     """

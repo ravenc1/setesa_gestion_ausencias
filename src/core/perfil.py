@@ -14,6 +14,7 @@ import re
 
 from dateutil.relativedelta import relativedelta
 
+from src.core.cache import escritura, lectura
 from src.core.crypto import cifrar, descifrar
 from src.core.database import get_connection
 from src.core.logging_config import obtener_logger
@@ -107,6 +108,7 @@ def validar_datos(nombre_rol, puesto, codigo_empleado, telefono):
     return datos
 
 
+@lectura(ttl=60)
 def obtener_perfil(id_usuario):
     """Datos del usuario con su plazo de actualización, o None."""
     conn = get_connection()
@@ -150,6 +152,7 @@ def obtener_perfil(id_usuario):
     return perfil
 
 
+@escritura
 def actualizar_mis_datos(id_usuario, puesto, codigo_empleado=None, telefono=None):
     """Guarda los datos, reinicia el plazo de 6 meses y lo audita.
 

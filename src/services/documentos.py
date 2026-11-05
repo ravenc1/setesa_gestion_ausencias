@@ -197,3 +197,26 @@ def verificar_integridad_pdf(id_solicitud):
     else:
         resultado["estado"] = "ok" if actual == esperado else "alterado"
     return resultado
+
+
+def obtener_pdf_final_verificado(id_solicitud):
+    """Devuelve (nombre, contenido, integridad) descargando el PDF una sola vez.
+
+    ``integridad`` tiene la misma forma que ``verificar_integridad_pdf``. Como el
+    PDF final es inmutable, la pantalla puede guardar este resultado un rato.
+    """
+    nombre, contenido = preparar_pdf_descarga(id_solicitud)
+    datos = obtener_solicitud(id_solicitud)
+    esperado = datos.get("pdf_hash")
+    actual = sha256_bytes(contenido)
+    if not esperado:
+        estado = "sin_sello"
+    else:
+        estado = "ok" if actual == esperado else "alterado"
+    return nombre, contenido, {
+        "estado": estado,
+        "ruta": datos.get("ruta_pdf"),
+        "sello_esperado": esperado,
+        "sello_actual": actual,
+        "inmutable": bool(datos.get("pdf_inmutable")),
+    }

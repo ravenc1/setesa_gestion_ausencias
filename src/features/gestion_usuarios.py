@@ -21,6 +21,7 @@ from src.core.gestion_usuarios import (
     resetear_password,
 )
 from src.core.avisos import ultimos_avisos
+from src.ui.pestanas import abierta, pestanas
 from src.core.recordatorios import construir_enlace_correo
 from src.core.reasignacion import contar_pendientes_coordinador
 from src.core.vigencia import DIAS_AVISO, obtener_por_vencer
@@ -193,9 +194,10 @@ def _acciones_acceso(fila):
     with col_clave:
         with st.form(f"form_reset_{id_usuario}"):
             nueva = st.text_input(
-                "Nueva contraseña",
+                "Contraseña temporal",
                 type="password",
                 key=f"reset_nueva_{id_usuario}",
+                help="Entréguesela al usuario: deberá cambiarla al iniciar sesión.",
             )
             confirmar = st.text_input(
                 "Confirmar contraseña",
@@ -269,10 +271,13 @@ def _tab_crear(roles):
             key="crear_dias",
         )
         password = st.text_input(
-            "Contraseña inicial",
+            "Contraseña temporal",
             type="password",
             key="crear_password",
-            help="Mínimo 8 caracteres, con al menos una letra y un número.",
+            help=(
+                "Mínimo 8 caracteres, con al menos una letra y un número. El "
+                "usuario deberá cambiarla al iniciar sesión por primera vez."
+            ),
         )
         confirmar = st.text_input(
             "Confirmar contraseña", type="password", key="crear_confirmar"
@@ -408,24 +413,29 @@ def mostrar_panel_usuarios():
         st.error("No se pudieron cargar los roles del sistema.")
         return
 
-    df = listar_usuarios()
-    tab_usuarios, tab_crear, tab_reasignar, tab_vencer, tab_auditoria = st.tabs(
+    tab_usuarios, tab_crear, tab_reasignar, tab_vencer, tab_auditoria = pestanas(
         [
             "👥 Usuarios",
             "➕ Crear usuario",
             "🔁 Reasignar Coordinador",
             "⏳ Por vencer",
             "🧾 Auditoría",
-        ]
+        ],
+        "tabs_it",
     )
     with tab_usuarios:
-        _tab_usuarios(df, roles)
+        if abierta(tab_usuarios):
+            _tab_usuarios(listar_usuarios(), roles)
     with tab_crear:
-        _tab_crear(roles)
+        if abierta(tab_crear):
+            _tab_crear(roles)
     with tab_reasignar:
-        # IT da de baja al coordinador saliente y reasigna sus expedientes.
-        mostrar_panel_reasignacion()
+        if abierta(tab_reasignar):
+            # IT da de baja al coordinador saliente y reasigna sus expedientes.
+            mostrar_panel_reasignacion()
     with tab_vencer:
-        _tab_por_vencer()
+        if abierta(tab_vencer):
+            _tab_por_vencer()
     with tab_auditoria:
-        _tab_auditoria()
+        if abierta(tab_auditoria):
+            _tab_auditoria()
