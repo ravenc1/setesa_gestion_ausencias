@@ -752,6 +752,26 @@ formulario; el dashboard muestra tiempos promedio y usuarios inactivos. ✅ **Cu
 
 ---
 
+### Fase 23 — Identidad visual de SETESA (azul y blanco)
+
+- [x] **Tema** (`.streamlit/config.toml`): azul marino `#203868` y celeste `#68B0D8` del logo, fondo blanco y bordes redondeados; encabezado de tablas en azul; barra lateral azul; menú reducido de Streamlit.
+- [x] **Estilos propios** (`src/ui/estilos.py`): banner degradado en cada panel, tarjetas de indicadores con borde azul, pestañas, formularios, botones y fondo suaves. Si un estilo fallara, la aplicación sigue funcionando.
+- [x] **Inicio de sesión**: logo, tarjeta centrada y botón azul; el mensaje de error indica el límite de intentos.
+- [x] **Barra lateral**: logo de SETESA, tarjeta del usuario con su rol (nombre visible, p. ej. «Contabilidad y RR.HH.») y «Cerrar Sesión»; arranca expandida.
+- [x] **Tablas** del dashboard con los estados y resoluciones resaltados; sin «None» en las columnas sin dato.
+- [x] **Ícono de la pestaña** con el emblema de SETESA y pie de página.
+- [x] Los textos que vienen de la base se escapan antes de mostrarse como HTML (nombre del usuario, títulos).
+- [x] Se reemplazó el ícono 🪪 (no existe en Windows 10) por 👤.
+- [x] Pruebas `tests/test_estilos.py` (8); la prueba del flujo completo, las pantallas por rol y el control de acceso siguen en verde.
+- [x] Revisión con capturas reales en Edge (inicio de sesión y los cinco roles).
+
+**Límites de Streamlit:** el recuadro donde se dibuja la firma y el selector de
+archivos son componentes del propio Streamlit (textos y aspecto internos); los
+estilos usan sus selectores `data-testid`, por eso la versión está fijada en
+`requirements.txt`.
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
