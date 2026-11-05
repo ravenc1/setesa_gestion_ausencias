@@ -9,6 +9,7 @@ import pandas as pd
 
 from src.core.crypto import cifrar, descifrar_campos
 from src.core.database import get_connection, get_engine
+from src.core.evidencias import evidencia_obligatoria, insertar_evidencias
 from src.core.feriados import fechas_feriados
 from src.core.logging_config import obtener_logger
 from src.core.recordatorios import marcar_atendidos
@@ -130,12 +131,17 @@ def registrar_solicitud(
     dias_solicitados,
     explicacion,
     firma_empleado_b64=None,
+    evidencias=None,
 ):
     """Registra una solicitud y la deja lista para la firma del Coordinador GTC.
 
     Implementa la decisión D-01 (opción C): la solicitud nace en 'Ingresada'
     y, dentro de la misma transacción, pasa a 'Pendiente de Firma Coordinador'.
     Ambos eventos quedan en solicitud_historial.
+
+    ``evidencias`` (Fase 18) son los metadatos de archivos ya subidos con
+    ``evidencias.subir_evidencias``; se registran en la misma transacción. La
+    SUSPENSIÓN IGSS exige al menos una.
 
     ``id_coordinador`` es el usuario Coordinador GTC (jefe inmediato) que
     recibirá el expediente en su bandeja. Debe estar vigente; su nombre se
@@ -146,6 +152,11 @@ def registrar_solicitud(
     validar_fechas(fecha_inicio, fecha_fin)
     if not id_coordinador:
         raise ValidacionError("Debe seleccionar al Jefe Inmediato GTC.")
+    if evidencia_obligatoria(tipo_ausencia) and not evidencias:
+        raise ValidacionError(
+            "La SUSPENSIÓN IGSS requiere adjuntar la constancia del IGSS como "
+            "evidencia (PDF, JPG o PNG)."
+        )
 
     # H-17: los días se recalculan en el servidor descontando feriados.
     feriados = fechas_feriados(fecha_inicio, fecha_fin)
@@ -231,6 +242,9 @@ def registrar_solicitud(
                     id_usuario,
                     "Enviada para firma del Coordinador GTC.",
                 )
+
+                # Fase 18: evidencias en la misma transacción del registro.
+                insertar_evidencias(cursor, id_solicitud, id_usuario, evidencias)
 
                 # H-01: registrar actividad del usuario en la misma transacción.
                 marcar_actividad(cursor, id_usuario)

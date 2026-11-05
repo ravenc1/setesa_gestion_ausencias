@@ -280,6 +280,41 @@ CREATE INDEX IF NOT EXISTS idx_aviso_actualizacion_fecha
     ON aviso_actualizacion (fecha_envio DESC);
 
 -- ---------------------------------------------------------------------------
+-- Fase 18: evidencias adjuntas (el archivo vive en el bucket privado) y
+--   avisos dentro del sistema al finalizar un expediente.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS evidencia (
+    id_evidencia    SERIAL PRIMARY KEY,
+    id_solicitud    INTEGER NOT NULL REFERENCES solicitud(id_solicitud) ON DELETE CASCADE,
+    id_usuario      INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    nombre_original VARCHAR(255) NOT NULL,
+    clave           VARCHAR(300) NOT NULL UNIQUE,
+    tipo_mime       VARCHAR(50) NOT NULL,
+    tamano          INTEGER NOT NULL,
+    sha256          VARCHAR(64) NOT NULL,
+    fecha           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT evidencia_tipo_check CHECK (
+        tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')
+    ),
+    CONSTRAINT evidencia_tamano_check CHECK (tamano > 0 AND tamano <= 5242880)
+);
+
+CREATE INDEX IF NOT EXISTS idx_evidencia_solicitud ON evidencia (id_solicitud);
+
+CREATE TABLE IF NOT EXISTS notificacion (
+    id_notificacion SERIAL PRIMARY KEY,
+    id_destinatario INTEGER NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    id_solicitud    INTEGER NOT NULL REFERENCES solicitud(id_solicitud) ON DELETE CASCADE,
+    tipo            VARCHAR(30) NOT NULL DEFAULT 'FINALIZADA',
+    mensaje         TEXT NOT NULL,
+    leida           BOOLEAN NOT NULL DEFAULT FALSE,
+    fecha           TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notificacion_destinatario
+    ON notificacion (id_destinatario, leida, fecha DESC);
+
+-- ---------------------------------------------------------------------------
 -- Fase 13: las reglas de integridad y vigencia en el motor de datos están en
 -- docs/triggers.sql (se aplican con scripts/migracion_fase13.py).
 -- ---------------------------------------------------------------------------

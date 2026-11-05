@@ -17,6 +17,12 @@ from src.core.utils import calcular_dias_habiles
 from src.core.vacaciones import TIPO_VACACION, obtener_saldo_vacaciones
 from src.core.validaciones import ValidacionError
 from src.core.solicitudes import registrar_solicitud, obtener_historial
+from src.core.evidencias import (
+    EvidenciaError,
+    evidencia_obligatoria,
+    subir_evidencias,
+)
+from src.features.evidencias import mostrar_evidencias
 from src.core.recordatorios import (
     RecordatorioError,
     construir_enlace_correo,
@@ -27,17 +33,20 @@ from src.core.workflow import ESTADO_PENDIENTE_FIRMA_COORDINADOR
 
 logger = obtener_logger("setesa.registro")
 
-def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, id_coordinador, puesto, codigo, dias, exp, firma_b64):
+def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, id_coordinador, puesto, codigo, dias, exp, firma_b64, archivos=None):
     """Inserta la solicitud y su historial en una sola transacción.
 
     Devuelve el id_solicitud generado o None si falla. El servicio deja la
     solicitud en 'Pendiente de Firma Coordinador' (decisión D-01, opción C).
     """
     try:
+        # Fase 18: las evidencias se validan y suben antes de registrar.
+        evidencias = subir_evidencias(archivos or [])
         return registrar_solicitud(
-            id_us, tipo, f_ini, f_fin, id_coordinador, puesto, codigo, dias, exp, firma_b64
+            id_us, tipo, f_ini, f_fin, id_coordinador, puesto, codigo, dias, exp,
+            firma_b64, evidencias=evidencias,
         )
-    except ValidacionError as e:
+    except (ValidacionError, EvidenciaError) as e:
         st.error(f"❌ {e}")
         return None
     except Exception as e:
@@ -184,6 +193,17 @@ def mostrar_formulario():
                 )
             
             explicacion = st.text_area("EXPLICACIÓN DE LA ACCIÓN:", height=100)
+
+            # Fase 18: evidencias (obligatorias solo en SUSPENSIÓN IGSS).
+            obligatoria = evidencia_obligatoria(tipo_ausencia)
+            adjuntos = st.file_uploader(
+                "📎 Evidencias (PDF, JPG o PNG; máximo 5 MB cada una)"
+                + (" — OBLIGATORIA: adjunte la constancia del IGSS" if obligatoria else " — opcional"),
+                type=["pdf", "jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                key="evidencias_registro",
+            )
+            archivos = [(a.name, a.getvalue()) for a in (adjuntos or [])]
             st.write("---")
             
             # --- FLUJO DE DOS PASOS ESTRICTO ---
@@ -193,6 +213,8 @@ def mostrar_formulario():
                     if st.button("✍️ Firmar Electrónicamente", type="primary"):
                         if not id_coordinador or not explicacion:
                             st.error("❌ Llene todos los campos para proceder.")
+                        elif obligatoria and not archivos:
+                            st.error("❌ La SUSPENSIÓN IGSS requiere adjuntar la constancia del IGSS.")
                         elif dias_solicitados == 0:
                             st.error("❌ El rango seleccionado no contiene días hábiles (solo fines de semana o feriados).")
                         elif (
@@ -244,7 +266,7 @@ def mostrar_formulario():
                             id_solicitud = registrar_solicitud_firmada(
                                 id_us, tipo_ausencia, fecha_inicio, fecha_fin,
                                 int(id_coordinador), puesto, codigo, dias_solicitados,
-                                explicacion, firma_base64,
+                                explicacion, firma_base64, archivos,
                             )
                             if id_solicitud:
                                 # El servicio toma los datos ya persistidos y
@@ -296,6 +318,16 @@ def mostrar_formulario():
                     st.error(f"No se pudo generar el PDF: {e}")
                 else:
                     st.download_button(f"📥 Descargar Expediente #{id_descarga} ({fila['estado_workflow']})", data=contenido_pdf, file_name=nombre_pdf, mime="application/pdf", type="primary")
+
+            # Fase 18: evidencias del expediente.
+            st.write("---")
+            st.markdown("#### 📎 Evidencias")
+            mostrar_evidencias(
+                id_descarga,
+                st.session_state["id_usuario"],
+                "consultor",
+                permitir_agregar=fila["estado_workflow"] != "Finalizada",
+            )
 
             # R-11: aviso auditable al Coordinador GTC del banco.
             st.write("---")

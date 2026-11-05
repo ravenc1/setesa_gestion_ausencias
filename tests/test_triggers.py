@@ -44,6 +44,11 @@ def cur():
             cursor.execute(
                 f"ALTER TABLE solicitud ADD COLUMN IF NOT EXISTS {columna}"
             )
+        # Tablas de la Fase 18.
+        from scripts.migracion_fase18 import DDL as DDL_FASE18
+
+        for sentencia in DDL_FASE18:
+            cursor.execute(sentencia)
         cursor.execute(SQL_TRIGGERS)
         yield cursor
     finally:
@@ -475,4 +480,82 @@ def test_borrador_no_puede_marcarse_inmutable(cur, actores):
         cur,
         "UPDATE solicitud SET pdf_inmutable = TRUE WHERE id_solicitud = %s",
         (id_sol,),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fase 18: evidencias y avisos al finalizar
+# ---------------------------------------------------------------------------
+INSERT_EVIDENCIA = """
+    INSERT INTO evidencia
+        (id_solicitud, id_usuario, nombre_original, clave, tipo_mime, tamano, sha256)
+    VALUES (%s, %s, 'c.pdf', 'evidencias/' || md5(random()::text) || '.pdf',
+            'application/pdf', 10, repeat('a', 64))
+"""
+
+
+def test_igss_sin_evidencia_se_revierte(cur, actores):
+    cur.execute(
+        "INSERT INTO solicitud (id_usuario, tipo_ausencia, fecha_inicio, fecha_fin, "
+        "estado_workflow, id_coordinador) VALUES (%s, 'SUSPENSIÓN IGSS', "
+        "DATE '2034-02-06', DATE '2034-02-07', 'Ingresada', %s) RETURNING id_solicitud",
+        (actores["consultor"], actores["coord"]),
+    )
+    id_sol = cur.fetchone()[0]
+    _historial(cur, id_sol, None, "Ingresada", actores["consultor"])
+    assert _rechaza(cur, "SET CONSTRAINTS trg_solicitud_evidencia_igss IMMEDIATE")
+
+
+def test_igss_con_evidencia_se_acepta(cur, actores):
+    cur.execute(
+        "INSERT INTO solicitud (id_usuario, tipo_ausencia, fecha_inicio, fecha_fin, "
+        "estado_workflow, id_coordinador) VALUES (%s, 'SUSPENSIÓN IGSS', "
+        "DATE '2034-02-06', DATE '2034-02-07', 'Ingresada', %s) RETURNING id_solicitud",
+        (actores["consultor"], actores["coord"]),
+    )
+    id_sol = cur.fetchone()[0]
+    _historial(cur, id_sol, None, "Ingresada", actores["consultor"])
+    cur.execute(INSERT_EVIDENCIA, (id_sol, actores["consultor"]))
+    assert not _rechaza(cur, "SET CONSTRAINTS trg_solicitud_evidencia_igss IMMEDIATE")
+
+
+def test_solo_el_dueno_adjunta_evidencias(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    assert _rechaza(cur, INSERT_EVIDENCIA, (id_sol, actores["coord"]))
+    assert not _rechaza(cur, INSERT_EVIDENCIA, (id_sol, actores["consultor"]))
+
+
+def test_evidencias_inmutables_y_no_en_finalizados(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    cur.execute(INSERT_EVIDENCIA, (id_sol, actores["consultor"]))
+    assert _rechaza(cur, "DELETE FROM evidencia WHERE id_solicitud = %s", (id_sol,))
+    assert _rechaza(
+        cur, "UPDATE evidencia SET nombre_original = 'x' WHERE id_solicitud = %s", (id_sol,)
+    )
+    _finalizar(cur, actores, id_sol)
+    assert _rechaza(cur, INSERT_EVIDENCIA, (id_sol, actores["consultor"]))
+
+
+def test_finalizar_avisa_a_contabilidad_y_al_consultor(cur, actores):
+    conta = _usuario(cur, "Contabilidad")
+    id_sol = _solicitud_pendiente(cur, actores)
+    _finalizar(cur, actores, id_sol)
+    cur.execute(
+        "SELECT id_destinatario, mensaje FROM notificacion WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+    avisos = dict(cur.fetchall())
+    assert conta in avisos and actores["consultor"] in avisos
+    assert actores["coord"] not in avisos
+    assert "APROBADA" in avisos[conta]
+
+    # Del aviso solo se marca la lectura.
+    assert not _rechaza(
+        cur, "UPDATE notificacion SET leida = TRUE WHERE id_solicitud = %s", (id_sol,)
+    )
+    assert _rechaza(
+        cur, "UPDATE notificacion SET mensaje = 'x' WHERE id_solicitud = %s", (id_sol,)
+    )
+    assert _rechaza(
+        cur, "UPDATE notificacion SET leida = FALSE WHERE id_solicitud = %s", (id_sol,)
     )

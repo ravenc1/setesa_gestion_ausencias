@@ -23,7 +23,7 @@ from src.core.recordatorios import construir_enlace_correo
 from src.core.reasignacion import contar_pendientes_coordinador
 from src.core.vigencia import DIAS_AVISO, obtener_por_vencer
 from src.features.reasignacion import mostrar_panel_reasignacion
-from src.core.security import ROL_IT, rol_autorizado
+from src.core.security import ROL_IT, nombre_rol_visible, rol_autorizado
 
 COLUMNAS_USUARIOS = {
     "id_usuario": "ID",
@@ -62,7 +62,7 @@ def _etiqueta_usuario(fila):
     estado = "Activo" if fila["estado_vigencia"] else "Inactivo"
     return (
         f"#{fila['id_usuario']} · {fila['nombre_completo']} · "
-        f"{fila['nombre_rol']} · {estado}"
+        f"{nombre_rol_visible(fila['nombre_rol'])} · {estado}"
     )
 
 
@@ -101,6 +101,7 @@ def _formulario_edicion(fila, roles):
             "Rol",
             roles["nombre_rol"].tolist(),
             index=_indice_rol(roles, fila["nombre_rol"]),
+            format_func=nombre_rol_visible,
             key=f"editar_rol_{id_usuario}",
             disabled=es_yo,
         )
@@ -247,7 +248,12 @@ def _tab_crear(roles):
     with st.form("form_crear_usuario"):
         nombre = st.text_input("Nombre completo", key="crear_nombre")
         correo = st.text_input("Correo registrado", key="crear_correo")
-        rol = st.selectbox("Rol", roles["nombre_rol"].tolist(), key="crear_rol")
+        rol = st.selectbox(
+            "Rol",
+            roles["nombre_rol"].tolist(),
+            key="crear_rol",
+            format_func=nombre_rol_visible,
+        )
         dias = st.number_input(
             "Días de vacaciones asignados",
             min_value=0,

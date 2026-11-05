@@ -688,6 +688,21 @@ la llave de Supabase).
 
 ---
 
+### Fase 18 — Evidencias y aviso a Contabilidad y RR.HH. · tesis figura 43, tabla 65 y 4.12.3 paso 6
+
+- [x] **Evidencias** PDF/JPG/PNG de hasta 5 MB (tipo verificado por contenido) al registrar o mientras la solicitud está en trámite; se guardan en el bucket privado con su SHA-256.
+- [x] **SUSPENSIÓN IGSS** exige al menos una evidencia (app y trigger diferido).
+- [x] **Acceso**: consultor dueño, Contabilidad y RR.HH. y Gerencia; el Coordinador GTC no las ve. Se verifican contra su sello al descargarlas.
+- [x] **Triggers**: evidencias inmutables, solo del dueño vigente y no en expedientes finalizados.
+- [x] **Aviso al finalizar** (`trg_solicitud_notificar`): notificación para Contabilidad y RR.HH. y para el consultor, sin el motivo; sección «🔔 Avisos» con contador y enlace mailto al consultor. Del aviso solo cambia «leída».
+- [x] **Nombre visible** «Contabilidad y RR.HH.» (y «Administrador (Gerencia)») en menú, títulos y panel de IT; en la base el rol sigue como `Contabilidad`.
+- [x] Migración `scripts/migracion_fase18.py` y pruebas `tests/test_evidencias.py` (21) y `tests/test_triggers.py` (34).
+
+**Criterio de aceptación:** una SUSPENSIÓN IGSS no se registra sin constancia,
+y al finalizar un expediente Contabilidad y RR.HH. recibe el aviso. ✅ **Cumplido.**
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:

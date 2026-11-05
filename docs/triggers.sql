@@ -418,3 +418,137 @@ DROP TRIGGER IF EXISTS trg_historial_inmutable ON solicitud_historial;
 CREATE TRIGGER trg_historial_inmutable
     BEFORE UPDATE OR DELETE ON solicitud_historial
     FOR EACH ROW EXECUTE FUNCTION setesa_trg_historial_inmutable();
+
+
+-- -----------------------------------------------------------------------------
+-- 5. Evidencias (Fase 18)
+--    Las adjunta el consultor dueño mientras la solicitud está en trámite; no
+--    se modifican ni se borran. SUSPENSIÓN IGSS exige al menos una.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION setesa_trg_evidencia_insert()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_estado VARCHAR;
+    v_dueno  INTEGER;
+BEGIN
+    SELECT estado_workflow, id_usuario INTO v_estado, v_dueno
+      FROM solicitud WHERE id_solicitud = NEW.id_solicitud;
+    IF v_estado = 'Finalizada' THEN
+        RAISE EXCEPTION 'SETESA: no se agregan evidencias a un expediente finalizado.';
+    END IF;
+    IF NEW.id_usuario IS DISTINCT FROM v_dueno
+       OR NOT setesa_usuario_vigente(NEW.id_usuario) THEN
+        RAISE EXCEPTION 'SETESA: solo el consultor dueño, vigente, adjunta evidencias.';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_evidencia_insert ON evidencia;
+CREATE TRIGGER trg_evidencia_insert
+    BEFORE INSERT ON evidencia
+    FOR EACH ROW EXECUTE FUNCTION setesa_trg_evidencia_insert();
+
+
+CREATE OR REPLACE FUNCTION setesa_trg_evidencia_inmutable()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT setesa_borrado_permitido() THEN
+        RAISE EXCEPTION 'SETESA: las evidencias no se modifican ni se eliminan.';
+    END IF;
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_evidencia_inmutable ON evidencia;
+CREATE TRIGGER trg_evidencia_inmutable
+    BEFORE UPDATE OR DELETE ON evidencia
+    FOR EACH ROW EXECUTE FUNCTION setesa_trg_evidencia_inmutable();
+
+
+-- Al confirmar el registro, una SUSPENSIÓN IGSS debe traer su evidencia.
+CREATE OR REPLACE FUNCTION setesa_trg_solicitud_evidencia_igss()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.tipo_ausencia = 'SUSPENSIÓN IGSS'
+       AND EXISTS (SELECT 1 FROM solicitud WHERE id_solicitud = NEW.id_solicitud)
+       AND NOT EXISTS (SELECT 1 FROM evidencia WHERE id_solicitud = NEW.id_solicitud)
+    THEN
+        RAISE EXCEPTION 'SETESA: la SUSPENSIÓN IGSS requiere adjuntar la constancia como evidencia.';
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_solicitud_evidencia_igss ON solicitud;
+CREATE CONSTRAINT TRIGGER trg_solicitud_evidencia_igss
+    AFTER INSERT ON solicitud
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION setesa_trg_solicitud_evidencia_igss();
+
+
+-- -----------------------------------------------------------------------------
+-- 6. Aviso al finalizar (Fase 18; tesis 4.12.3 paso 6)
+--    Al pasar a Finalizada se avisa a Contabilidad y RR.HH. (vigentes) y al
+--    consultor dueño. El aviso no incluye el motivo de la resolución.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION setesa_trg_solicitud_notificar()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_mensaje TEXT;
+BEGIN
+    IF NEW.estado_workflow = 'Finalizada'
+       AND OLD.estado_workflow IS DISTINCT FROM 'Finalizada' THEN
+        SELECT 'Expediente #' || NEW.id_solicitud || ' de ' || u.nombre_completo
+               || ' (' || NEW.tipo_ausencia || ', del '
+               || to_char(NEW.fecha_inicio, 'DD/MM/YYYY') || ' al '
+               || to_char(NEW.fecha_fin, 'DD/MM/YYYY') || '): '
+               || upper(COALESCE(NEW.resolucion, 'finalizado')) || '.'
+          INTO v_mensaje
+          FROM usuario u WHERE u.id_usuario = NEW.id_usuario;
+
+        INSERT INTO notificacion (id_destinatario, id_solicitud, tipo, mensaje)
+        SELECT u.id_usuario, NEW.id_solicitud, 'FINALIZADA', v_mensaje
+          FROM usuario u
+          JOIN rol r ON r.id_rol = u.id_rol
+         WHERE r.nombre_rol = 'Contabilidad' AND u.estado_vigencia = TRUE
+        UNION
+        SELECT NEW.id_usuario, NEW.id_solicitud, 'FINALIZADA', v_mensaje;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_solicitud_notificar ON solicitud;
+CREATE TRIGGER trg_solicitud_notificar
+    AFTER UPDATE OF estado_workflow ON solicitud
+    FOR EACH ROW EXECUTE FUNCTION setesa_trg_solicitud_notificar();
+
+
+-- De un aviso solo cambia "leida" (de FALSE a TRUE).
+CREATE OR REPLACE FUNCTION setesa_trg_notificacion_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF setesa_borrado_permitido() THEN
+        RETURN NEW;
+    END IF;
+    IF (to_jsonb(NEW) - 'leida') IS DISTINCT FROM (to_jsonb(OLD) - 'leida')
+       OR (OLD.leida AND NOT NEW.leida) THEN
+        RAISE EXCEPTION 'SETESA: de un aviso solo puede marcarse que fue leído.';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_notificacion_update ON notificacion;
+CREATE TRIGGER trg_notificacion_update
+    BEFORE UPDATE ON notificacion
+    FOR EACH ROW EXECUTE FUNCTION setesa_trg_notificacion_update();
