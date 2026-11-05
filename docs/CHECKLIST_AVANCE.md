@@ -720,6 +720,22 @@ datos de la solicitud. ✅ **Cumplido.**
 
 ---
 
+### Fase 20 — Seguridad de sesión · tesis 4.2 (OWASP, sesiones seguras)
+
+- [x] **Límite de intentos**: 5 contraseñas incorrectas seguidas bloquean el acceso 15 minutos; durante el bloqueo ni la contraseña correcta sirve. El conteo vive en la base (`intento_login`), no en la sesión, así que otra pestaña o navegador no lo reinicia.
+- [x] **Sin enumeración de cuentas**: el conteo es por correo escrito, exista o no, con el mismo mensaje y un tiempo de respuesta parejo (hash de relleno).
+- [x] **Expiración de sesión**: 30 minutos de inactividad o 8 horas de duración máxima (`SESSION_IDLE_MINUTES`, `SESSION_MAX_HOURS`); al vencer se cierra la sesión y se pide iniciar de nuevo.
+- [x] **IT** ve los accesos bloqueados y puede desbloquearlos (auditado como `DESBLOQUEO`); restablecer la contraseña también levanta el bloqueo.
+- [x] Migración `scripts/migracion_fase20.py` y pruebas `tests/test_seguridad_sesion.py` (19; las de base de datos corren en una transacción que se revierte).
+
+**Criterio de aceptación:** tras 5 intentos fallidos el acceso se bloquea y una
+sesión inactiva se cierra sola. ✅ **Cumplido.**
+
+**Límite conocido:** Streamlit solo evalúa la expiración cuando el usuario
+interactúa; una pestaña abandonada se cierra en su siguiente clic.
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:

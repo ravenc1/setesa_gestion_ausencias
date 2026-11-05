@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS usuario_log (
     detalle     TEXT,
     CONSTRAINT usuario_log_accion_check CHECK (
         accion IN ('CREACION', 'EDICION', 'BAJA', 'REACTIVACION', 'RESET_PASSWORD',
-                   'ACTUALIZACION_DATOS')
+                   'ACTUALIZACION_DATOS', 'DESBLOQUEO')
     )
 );
 
@@ -313,6 +313,16 @@ CREATE TABLE IF NOT EXISTS notificacion (
 
 CREATE INDEX IF NOT EXISTS idx_notificacion_destinatario
     ON notificacion (id_destinatario, leida, fecha DESC);
+
+-- ---------------------------------------------------------------------------
+-- Fase 20: límite de intentos de acceso (por correo escrito, exista o no).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS intento_login (
+    correo          VARCHAR(150) PRIMARY KEY,
+    intentos        INTEGER NOT NULL DEFAULT 0,
+    ultimo_intento  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    bloqueado_hasta TIMESTAMP
+);
 
 -- ---------------------------------------------------------------------------
 -- Fase 13: las reglas de integridad y vigencia en el motor de datos están en

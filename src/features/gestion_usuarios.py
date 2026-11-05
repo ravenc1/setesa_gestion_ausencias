@@ -12,8 +12,10 @@ from src.core.gestion_usuarios import (
     OperacionNoPermitida,
     cambiar_estado_usuario,
     crear_usuario,
+    desbloquear_acceso,
     editar_usuario,
     listar_auditoria,
+    listar_bloqueos,
     listar_roles,
     listar_usuarios,
     resetear_password,
@@ -295,11 +297,41 @@ def _tab_crear(roles):
             st.rerun()
 
 
+def _bloqueos_de_acceso():
+    """Accesos bloqueados por intentos fallidos, con desbloqueo (Fase 20)."""
+    st.markdown("#### 🔒 Accesos bloqueados")
+    bloqueos = listar_bloqueos()
+    if bloqueos.empty:
+        st.success("No hay accesos bloqueados por intentos fallidos.")
+        return
+    st.caption(
+        "El bloqueo se levanta solo al cumplirse el plazo; también puede "
+        "levantarlo aquí o restableciendo la contraseña del usuario."
+    )
+    for fila in bloqueos.itertuples():
+        col_info, col_boton = st.columns([4, 1])
+        col_info.write(
+            f"**{fila.nombre_completo or 'Correo no registrado'}** · "
+            f"{fila.correo} · {fila.intentos} intentos · bloqueado hasta "
+            f"{fila.bloqueado_hasta:%H:%M}"
+        )
+        if col_boton.button("Desbloquear", key=f"desbloquear_{fila.correo}"):
+            try:
+                desbloquear_acceso(st.session_state["id_usuario"], fila.correo)
+            except (OperacionNoPermitida, GestionUsuariosError) as e:
+                st.error(f"⚠️ {e}")
+            else:
+                _flash("success", f"Acceso de {fila.correo} desbloqueado.")
+                st.rerun()
+
+
 def _tab_auditoria():
+    _bloqueos_de_acceso()
+    st.write("---")
     st.markdown("#### 🧾 Últimas acciones de gestión")
     st.caption(
-        "Se registran altas, ediciones, bajas, reactivaciones y reseteos de "
-        "contraseña, con el ejecutor y el usuario afectado."
+        "Se registran altas, ediciones, bajas, reactivaciones, reseteos de "
+        "contraseña y desbloqueos, con el ejecutor y el usuario afectado."
     )
     df = listar_auditoria()
     if df.empty:
