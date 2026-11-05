@@ -223,7 +223,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | C-04 | **Persistir `firma_jefe_gtc`** | ✅ | `cambiar_estado(..., firma_b64=...)` en la misma transacción |
 | C-05 | Validar transición permitida | ✅ | `cambiar_estado` bloquea con `FOR UPDATE` + grafo de transiciones | — |
 | C-06 | Ver el PDF antes de firmar | 🔴 | No hay vista previa del expediente |
-| C-07 | Asignación por equipo/coordinador | 🔧 | Ve todas las solicitudes, no solo “las de su equipo” |
+| C-07 | Asignación por equipo/coordinador | ✅ | Fase 11: `solicitud.id_coordinador`; la bandeja muestra solo sus expedientes y solo él puede firmarlos |
 | C-08 | Rechazo / devolución con motivo | 🔴 | No definido en la tesis; decidir D-06 |
 | C-09 | Evidencia de auditoría | ✅ | `solicitud_historial` registra actor, fecha y observación | — |
 | C-10 | Bandeja de recordatorios | ✅ | **R-11**: aviso y tabla de recordatorios pendientes; se marcan atendidos al firmar | — |
@@ -558,6 +558,27 @@ queda atendido. ✅ **Cumplido.**
 **Criterio de aceptación:** IT crea una cuenta, la edita, la da de baja, la
 reactiva y le restablece la contraseña, y cada operación queda auditada; ningún
 otro rol puede gestionar usuarios. ✅ **Cumplido.**
+
+---
+
+### Fase 10 — Versionamiento controlado · `v0.10.0`
+
+- [x] Repositorio público en GitHub con ramas por fase, pull requests y CI.
+- [x] Convención documentada en `docs/VERSIONAMIENTO.md`; etiquetas `v0.9.0` y `v0.10.0`.
+- [x] Logo de SETESA versionado en `assets/`; la plantilla Excel interna queda fuera de Git.
+
+### Fase 11 — Bandeja del Coordinador por equipo · cierra C-07
+
+- [x] **FK** `solicitud.id_coordinador` → `usuario` (el nombre sigue en `jefe_gtc` para el PDF).
+- [x] **Registro**: el consultor elige a su jefe entre los Coordinadores GTC vigentes; ya no se escribe a mano.
+- [x] **Bandeja** (Tabla 9): cada coordinador ve solo los expedientes que le fueron asignados.
+- [x] **Firma**: `cambiar_estado` rechaza el visto bueno de un coordinador distinto al asignado (`CoordinadorNoAsignado`).
+- [x] **Recordatorios (R-11)**: van solo al coordinador asignado, sin reenvío a otro.
+- [x] **Migración** `scripts/migracion_fase11.py` (con `--simular` y `--asignar-sin-match ID`).
+- [x] Pruebas `tests/test_coordinador_equipo.py` (4 unitarias y 2 de integración).
+
+**Criterio de aceptación:** dos coordinadores no ven ni pueden firmar los
+expedientes del otro. ✅ **Cumplido.**
 
 ---
 
