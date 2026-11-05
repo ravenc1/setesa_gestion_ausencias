@@ -42,6 +42,7 @@ from src.services.documentos import (
 )
 from src.features.evidencias import mostrar_evidencias
 from src.services.utils_firma import canvas_to_base64
+from src.ui.estilos import colorear_estados
 
 logger = obtener_logger("setesa.dashboard")
 
@@ -170,7 +171,9 @@ def _mostrar_tabla(df_filtrado):
     vista = df_filtrado.iloc[inicio : inicio + tam_pagina].drop(
         columns=["ruta_pdf"], errors="ignore"
     )
-    st.dataframe(vista, width="stretch", hide_index=True)
+    if "resolucion" in vista:
+        vista = vista.assign(resolucion=vista["resolucion"].fillna("—"))
+    st.dataframe(colorear_estados(vista), width="stretch", hide_index=True)
     st.caption(
         f"Mostrando {len(vista)} de {len(df_filtrado)} expedientes filtrados."
     )

@@ -4,6 +4,7 @@
 import streamlit as st
 from src.core import auth
 from src.core.logging_config import configurar_logging
+from src.ui import estilos
 from src.features import (
     registro,
     dashboard,
@@ -19,7 +20,13 @@ from src.features import (
 
 configurar_logging()
 
-st.set_page_config(page_title="SETESA Workflow", page_icon="🏢", layout="wide")
+st.set_page_config(
+    page_title="SETESA Workflow",
+    page_icon=str(estilos.ICONO) if estilos.ICONO.exists() else "🏢",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+estilos.aplicar_estilos()
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
@@ -52,12 +59,10 @@ else:
         auth.show_login()
         st.stop()
 
-    st.sidebar.title("Perfil de Usuario")
-    st.sidebar.write(f"**Nombre:** {st.session_state['nombre']}")
     from src.core.security import nombre_rol_visible
-
-    st.sidebar.write(f"**Rol:** {nombre_rol_visible(st.session_state['rol'])}")
-    st.sidebar.write("---")
+    estilos.perfil_lateral(
+        st.session_state['nombre'], nombre_rol_visible(st.session_state['rol'])
+    )
 
     # Fase 14: Consultor y Contabilidad tienen además "Mis datos"; Fase 18:
     # ambos reciben avisos al finalizar un expediente.
@@ -68,7 +73,7 @@ else:
         )
         seccion = st.sidebar.radio(
             "Sección",
-            ["Principal", etiqueta_avisos, "🪪 Mis datos"],
+            ["Principal", etiqueta_avisos, "👤 Mis datos"],
             key="seccion_menu",
         )
         if seccion == etiqueta_avisos:
@@ -82,32 +87,48 @@ else:
     mis_datos.mostrar_aviso_actualizacion()
 
     # ENRUTAMIENTO POR ROLES
-    if seccion == "🪪 Mis datos":
+    if seccion == "👤 Mis datos":
         mis_datos.mostrar_mis_datos()
 
     elif seccion == "avisos":
         notificaciones.mostrar_notificaciones()
 
     elif st.session_state['rol'] == 'Consultor':
-        st.title("Panel Operativo - Consultor Técnico")
+        estilos.encabezado(
+            "Panel Operativo - Consultor Técnico",
+            "Registre y dé seguimiento a sus solicitudes de ausencia.",
+        )
         registro.mostrar_formulario()
         
     elif st.session_state['rol'] == 'Coordinador GTC':
         # NUEVA RUTA PARA EL CLIENTE
+        estilos.encabezado(
+            "Portal del Coordinador GTC",
+            "Revise y resuelva las solicitudes de los consultores de su equipo.",
+        )
         coordinador.mostrar_panel_coordinador()
         
     elif st.session_state['rol'] == 'Contabilidad':
         # HU-03: repositorio de expedientes en modo consulta.
-        st.title("Panel de Contabilidad y RR.HH. - SETESA")
+        estilos.encabezado(
+            "Panel de Contabilidad y RR.HH. - SETESA",
+            "Consulta y control de expedientes de ausencia.",
+        )
         dashboard.mostrar_dashboard()
 
     elif st.session_state['rol'] == 'IT':
         # Fase 9: el rol IT solo administra cuentas.
-        st.title("Panel de IT - Gestión de Usuarios")
+        estilos.encabezado(
+            "Panel de IT - Gestión de Usuarios",
+            "Altas, bajas y accesos de las cuentas del sistema.",
+        )
         gestion_usuarios.mostrar_panel_usuarios()
 
     elif st.session_state['rol'] == 'Administrador':
-        st.title("Panel Gerencial - SETESA")
+        estilos.encabezado(
+            "Panel Gerencial - SETESA",
+            "Autorizaciones, indicadores y catálogos de la organización.",
+        )
         tab1, tab2, tab3, tab4, tab5 = st.tabs(
             [
                 "📊 Dashboard de Solicitudes",
@@ -127,3 +148,5 @@ else:
             feriados.mostrar_panel_feriados()
         with tab5:
             motivos.mostrar_panel_motivos()
+
+    estilos.pie_de_pagina()

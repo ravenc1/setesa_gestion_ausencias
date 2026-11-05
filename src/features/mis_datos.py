@@ -40,7 +40,7 @@ def mostrar_mis_datos():
         st.error("Esta sección es solo para Consultor y Contabilidad y RR.HH.")
         return
 
-    st.markdown("### 🪪 Mis datos")
+    st.markdown("### 👤 Mis datos")
     flash = st.session_state.pop("flash_mis_datos", None)
     if flash:
         st.success(flash)

@@ -59,7 +59,7 @@ def test_panel_por_rol_sin_excepciones(rol):
     at.run()
 
     assert not at.exception, [e.value for e in at.exception]
-    assert any("Perfil de Usuario" in t.value for t in at.title)
+    assert any("Perfil de Usuario" in m.value for m in at.sidebar.markdown)
 
 
 @pytest.mark.skipif(
