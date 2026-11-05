@@ -18,7 +18,13 @@ from uuid import uuid4
 import psycopg2
 from PIL import Image
 
+import os
+
+# Fase 17: el smoke test usa el repositorio local, nunca el bucket real.
+os.environ["SUPABASE_SERVICE_KEY"] = ""
+
 from src.core.database import get_connection
+from src.services import almacenamiento
 from src.core.workflow import (
     ESTADO_FINALIZADA,
     ESTADO_INGRESADA,
@@ -89,11 +95,10 @@ def firma_dummy_b64():
 
 
 def _limpiar_pdf(ruta):
-    """Elimina el PDF de prueba y su sello sidecar."""
+    """Elimina el PDF de prueba del repositorio local (Fase 17)."""
     if not ruta:
         return
-    for archivo in (Path(ruta), Path(ruta).with_suffix(".pdf.sha256")):
-        archivo.unlink(missing_ok=True)
+    (almacenamiento.REPOSITORIO_DIR / ruta).unlink(missing_ok=True)
 
 
 def test_dias_habiles():
@@ -367,7 +372,7 @@ def test_consultor_flujo():
             )
 
             ruta = generar_pdf_solicitud(id_solicitud)
-            check("consultor: PDF del expediente", Path(ruta).exists(), f"-> {ruta}")
+            check("consultor: PDF del expediente", almacenamiento.existe(ruta), f"-> {ruta}")
             pdf_generado.append(ruta)
 
             datos = obtener_solicitud(id_solicitud)
@@ -380,7 +385,7 @@ def test_consultor_flujo():
             check("integridad: PDF coincide con el sello",
                   integridad["estado"] == "ok")
 
-            with open(ruta, "ab") as archivo:
+            with open(almacenamiento.REPOSITORIO_DIR / ruta, "ab") as archivo:
                 archivo.write(b"\n% alterado por el smoke test\n")
             integridad = verificar_integridad_pdf(id_solicitud)
             check("integridad: alteración detectada",
@@ -461,11 +466,12 @@ def test_dashboard_gerencia():
         check("dashboard: exportación CSV incluye el expediente",
               str(id_solicitud) in csv and nombre in csv)
 
-        ruta_pdf, contenido = preparar_pdf_descarga(id_solicitud)
+        nombre_pdf, contenido = preparar_pdf_descarga(id_solicitud)
+        ruta_pdf = obtener_solicitud(id_solicitud)["ruta_pdf"]
         check("dashboard: PDF final descargable con 3 firmas",
               contenido.startswith(b"%PDF")
               and contenido.count(b"/Subtype /Image") == 3,
-              f"-> {Path(ruta_pdf).name}")
+              f"-> {nombre_pdf}")
     except Exception as e:
         check("dashboard: repositorio y descarga", False, f"-> {e}")
     finally:
