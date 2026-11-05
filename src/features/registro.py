@@ -192,7 +192,10 @@ def mostrar_formulario():
                     + "."
                 )
             
-            explicacion = st.text_area("EXPLICACIÓN DE LA ACCIÓN:", height=100)
+            # Fase 19: el límite garantiza que quepa en el recuadro del PDF.
+            explicacion = st.text_area(
+                "EXPLICACIÓN DE LA ACCIÓN:", height=100, max_chars=1200
+            )
 
             # Fase 18: evidencias (obligatorias solo en SUSPENSIÓN IGSS).
             obligatoria = evidencia_obligatoria(tipo_ausencia)
