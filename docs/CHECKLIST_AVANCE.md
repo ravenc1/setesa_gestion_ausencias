@@ -813,6 +813,18 @@ la base de datos es de pocos milisegundos.
 
 ---
 
+### Fase 26 — Despliegue del prototipo (EN CURSO)
+
+- [x] Proyecto Supabase de producción independiente (`setesa_produccion`, us-west-2), base vacía; secretos propios y nuevos (`FERNET_KEY`, llave secreta) en `.env.produccion` (ignorado por git).
+- [x] `scripts/instalar_produccion.py`: instalador limpio (esquema + migraciones estructurales sin cuentas de demostración + bucket privado + único usuario IT con cambio de contraseña obligatorio). Se niega a correr sobre una base con usuarios o igual a la de pruebas.
+- [x] `render.yaml`: Render en Oregón, plan gratuito (temporal, mientras SETESA aprueba el presupuesto).
+- [x] Instalador ejecutado en producción (2026-11-05): 13 tablas, 27 triggers, pg_cron, bucket privado `expedientes`, 22 motivos, 30 feriados y un único usuario IT. Esquema comparado con la base de pruebas: columnas, restricciones, índices, triggers, funciones y roles idénticos.
+- [ ] Respaldo y restauración de la base de producción.
+- [ ] Publicar en Render, configurar secretos y SMTP, ensayar el flujo completo en la URL real.
+- [ ] Etiqueta `v1.0.0` tras el ensayo.
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:

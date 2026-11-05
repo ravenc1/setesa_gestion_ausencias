@@ -31,3 +31,7 @@ docs/_tesis_extraida.txt
 
 # Plantilla oficial de SETESA (documento interno; no se publica)
 proyecto_doc/Excel_PlantillaOficial_SETESA/
+
+# Tesis final (documento personal; no se publica)
+proyecto_doc/nueva_version_final/
+.env.produccion
