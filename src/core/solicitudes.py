@@ -45,6 +45,17 @@ class SolicitudNoEncontrada(Exception):
     """No existe una solicitud con el identificador indicado."""
 
 
+class CoordinadorNoAsignado(Exception):
+    """Quien intenta firmar no es el Coordinador GTC asignado al expediente."""
+
+    def __init__(self, id_solicitud):
+        self.id_solicitud = id_solicitud
+        super().__init__(
+            f"El expediente {id_solicitud} está asignado a otro Coordinador GTC; "
+            "solo el coordinador asignado puede darle su visto bueno."
+        )
+
+
 class FirmaRequerida(Exception):
     """La transición exige una firma electrónica que no fue enviada."""
 
@@ -80,12 +91,29 @@ def _registrar_historial(
     )
 
 
+def _coordinador_vigente(cursor, id_coordinador):
+    """Nombre del Coordinador GTC vigente con ese id, o None."""
+    cursor.execute(
+        """
+        SELECT u.nombre_completo
+        FROM usuario u
+        JOIN rol r ON u.id_rol = r.id_rol
+        WHERE u.id_usuario = %s
+          AND r.nombre_rol = 'Coordinador GTC'
+          AND u.estado_vigencia = TRUE
+        """,
+        (id_coordinador,),
+    )
+    fila = cursor.fetchone()
+    return fila[0] if fila else None
+
+
 def registrar_solicitud(
     id_usuario,
     tipo_ausencia,
     fecha_inicio,
     fecha_fin,
-    jefe_gtc,
+    id_coordinador,
     puesto,
     codigo_empleado,
     dias_solicitados,
@@ -98,9 +126,15 @@ def registrar_solicitud(
     y, dentro de la misma transacción, pasa a 'Pendiente de Firma Coordinador'.
     Ambos eventos quedan en solicitud_historial.
 
+    ``id_coordinador`` es el usuario Coordinador GTC (jefe inmediato) que
+    recibirá el expediente en su bandeja. Debe estar vigente; su nombre se
+    copia en ``jefe_gtc`` para el PDF oficial.
+
     Devuelve el id_solicitud generado. Lanza excepción si falla la transacción.
     """
     validar_fechas(fecha_inicio, fecha_fin)
+    if not id_coordinador:
+        raise ValidacionError("Debe seleccionar al Jefe Inmediato GTC.")
 
     # H-17: los días se recalculan en el servidor descontando feriados.
     feriados = fechas_feriados(fecha_inicio, fecha_fin)
@@ -131,13 +165,21 @@ def registrar_solicitud(
     try:
         with conn:  # commit al salir; rollback si hay excepción
             with conn.cursor() as cursor:
+                jefe_gtc = _coordinador_vigente(cursor, id_coordinador)
+                if not jefe_gtc:
+                    raise ValidacionError(
+                        "El Jefe Inmediato GTC seleccionado no es un "
+                        "Coordinador GTC vigente."
+                    )
+
                 cursor.execute(
                     """
                     INSERT INTO solicitud
                         (id_usuario, tipo_ausencia, fecha_inicio, fecha_fin,
-                         estado_workflow, jefe_gtc, puesto, codigo_empleado,
-                         dias_solicitados, explicacion, firma_empleado)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                         estado_workflow, jefe_gtc, id_coordinador, puesto,
+                         codigo_empleado, dias_solicitados, explicacion,
+                         firma_empleado)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id_solicitud
                     """,
                     (
@@ -147,6 +189,7 @@ def registrar_solicitud(
                         fecha_fin,
                         ESTADO_INGRESADA,
                         jefe_gtc,
+                        id_coordinador,
                         puesto,
                         codigo_empleado,
                         dias_solicitados,
@@ -205,7 +248,8 @@ def cambiar_estado(
 
     Devuelve una tupla (estado_anterior, estado_nuevo). Lanza
     TransicionInvalida si el salto no está permitido, SolicitudNoEncontrada
-    si el id no existe y FirmaRequerida si falta la firma exigida.
+    si el id no existe, FirmaRequerida si falta la firma exigida y
+    CoordinadorNoAsignado si firma un Coordinador GTC distinto al asignado.
     """
     conn = get_connection()
     if not conn:
@@ -215,7 +259,12 @@ def cambiar_estado(
         with conn:
             with conn.cursor() as cursor:
                 cursor.execute(
-                    "SELECT estado_workflow FROM solicitud WHERE id_solicitud = %s FOR UPDATE",
+                    """
+                    SELECT estado_workflow, id_coordinador
+                    FROM solicitud
+                    WHERE id_solicitud = %s
+                    FOR UPDATE
+                    """,
                     (id_solicitud,),
                 )
                 fila = cursor.fetchone()
@@ -224,9 +273,16 @@ def cambiar_estado(
                         f"No existe la solicitud con id {id_solicitud}."
                     )
 
-                estado_anterior = fila[0]
+                estado_anterior, id_coordinador = fila
                 if not puede_transicionar(estado_anterior, estado_nuevo):
                     raise TransicionInvalida(estado_anterior, estado_nuevo)
+
+                # Solo el coordinador asignado da el visto bueno del banco.
+                if (
+                    estado_nuevo == ESTADO_PENDIENTE_APROBACION_GERENCIA
+                    and id_coordinador != id_usuario
+                ):
+                    raise CoordinadorNoAsignado(id_solicitud)
 
                 columna_firma = _COLUMNA_FIRMA.get(estado_nuevo)
                 if columna_firma and not _firma_valida(firma_b64):

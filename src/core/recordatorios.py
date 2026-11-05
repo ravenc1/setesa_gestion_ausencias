@@ -43,24 +43,24 @@ class SinCoordinador(RecordatorioError):
     """No hay un Coordinador GTC vigente al que dirigir el recordatorio."""
 
 
-def _resolver_destinatario(cursor, jefe_gtc):
-    """Devuelve el Coordinador GTC asignado o, en su defecto, el primero vigente.
+def _resolver_destinatario(cursor, id_coordinador):
+    """Devuelve el Coordinador GTC asignado al expediente, si sigue vigente.
 
-    ``solicitud.jefe_gtc`` guarda el nombre visible del jefe inmediato. Si ese
-    nombre ya no coincide con un usuario vigente, se usa el primer coordinador
-    activo para no dejar el recordatorio sin destinatario.
+    El recordatorio va solo al coordinador que el consultor eligió como jefe
+    inmediato (``solicitud.id_coordinador``); nunca a otro coordinador.
     """
+    if not id_coordinador:
+        return None
     cursor.execute(
         """
         SELECT u.id_usuario, u.nombre_completo, u.correo_institucional
         FROM usuario u
         JOIN rol r ON u.id_rol = r.id_rol
-        WHERE r.nombre_rol = 'Coordinador GTC'
+        WHERE u.id_usuario = %s
+          AND r.nombre_rol = 'Coordinador GTC'
           AND u.estado_vigencia = TRUE
-        ORDER BY (u.nombre_completo = %s) DESC, u.nombre_completo ASC
-        LIMIT 1
         """,
-        (jefe_gtc or "",),
+        (id_coordinador,),
     )
     return cursor.fetchone()
 
@@ -82,7 +82,7 @@ def registrar_recordatorio(id_solicitud, id_emisor, mensaje=None):
                 # El bloqueo evita duplicados si el consultor pulsa dos veces.
                 cursor.execute(
                     """
-                    SELECT id_usuario, estado_workflow, jefe_gtc,
+                    SELECT id_usuario, estado_workflow, id_coordinador,
                            tipo_ausencia, fecha_inicio, fecha_fin
                     FROM solicitud
                     WHERE id_solicitud = %s
@@ -96,7 +96,7 @@ def registrar_recordatorio(id_solicitud, id_emisor, mensaje=None):
                         f"No existe el expediente con id {id_solicitud}."
                     )
 
-                id_dueno, estado, jefe, tipo, fecha_ini, fecha_fin = fila
+                id_dueno, estado, id_coordinador, tipo, fecha_ini, fecha_fin = fila
                 if id_dueno != id_emisor:
                     raise RecordatorioNoPermitido(
                         "Solo el consultor dueño del expediente puede enviar "
@@ -124,11 +124,11 @@ def registrar_recordatorio(id_solicitud, id_emisor, mensaje=None):
                 if reciente:
                     raise RecordatorioReciente(reciente[0])
 
-                destinatario = _resolver_destinatario(cursor, jefe)
+                destinatario = _resolver_destinatario(cursor, id_coordinador)
                 if not destinatario:
                     raise SinCoordinador(
-                        "No hay un Coordinador GTC vigente registrado para "
-                        "recibir el recordatorio."
+                        "El Coordinador GTC asignado a este expediente no está "
+                        "vigente. Comuníquese con Gerencia."
                     )
                 id_destinatario, nombre_destinatario, correo_destino = destinatario
 
