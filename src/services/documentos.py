@@ -84,6 +84,11 @@ def generar_pdf_solicitud(id_solicitud):
     datos = obtener_solicitud(id_solicitud)
     if not datos:
         raise ValueError(f"No existe la solicitud con id {id_solicitud}.")
+    if datos.get("resolucion") == "Retirada":
+        raise ValueError(
+            f"La solicitud {id_solicitud} fue retirada por el consultor y no "
+            "tiene PDF oficial."
+        )
     if datos.get("pdf_inmutable") and datos.get("ruta_pdf"):
         return datos["ruta_pdf"]
 

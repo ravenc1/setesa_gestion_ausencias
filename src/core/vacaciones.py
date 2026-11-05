@@ -54,6 +54,7 @@ def calcular_saldo_vacaciones(id_usuario, anio=None, fecha_referencia=None):
                   AND tipo_ausencia = %s
                   AND EXTRACT(YEAR FROM fecha_inicio) = %s
                   -- Fase 16: los días denegados vuelven al saldo.
+                  AND resolucion IS DISTINCT FROM 'Retirada'
                   AND resolucion IS DISTINCT FROM 'Denegada'
                 """,
                 (id_usuario, TIPO_VACACION, int(anio)),

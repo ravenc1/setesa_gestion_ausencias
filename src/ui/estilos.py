@@ -202,6 +202,7 @@ _COLORES_ESTADO = {
     "Finalizada": ("#E3F4E8", "#14532D"),
     "Aprobada": ("#E3F4E8", "#14532D"),
     "Denegada": ("#FBE4E4", "#7F1D1D"),
+    "Retirada": ("#EEF1F6", "#4B5B78"),
 }
 
 

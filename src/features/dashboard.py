@@ -111,7 +111,10 @@ def _mostrar_kpis(kpis):
     col5.metric(
         "Finalizadas",
         kpis["finalizadas"],
-        help=f"Aprobadas: {kpis['aprobadas']} · Denegadas: {kpis['denegadas']}",
+        help=(
+            f"Aprobadas: {kpis['aprobadas']} · Denegadas: {kpis['denegadas']} · "
+            f"Retiradas: {kpis['retiradas']}"
+        ),
     )
     st.caption(
         f"Resoluciones: ✅ {kpis['aprobadas']} aprobada(s) · "

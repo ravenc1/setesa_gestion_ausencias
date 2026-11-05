@@ -195,6 +195,7 @@ def listar_usuarios():
             SELECT id_usuario, SUM(COALESCE(dias_solicitados, 0)) AS dias_usados
             FROM solicitud
             WHERE tipo_ausencia = 'VACACION'
+              AND resolucion IS DISTINCT FROM 'Retirada'
               AND resolucion IS DISTINCT FROM 'Denegada'
               AND EXTRACT(YEAR FROM fecha_inicio)
                   = EXTRACT(YEAR FROM CURRENT_DATE)

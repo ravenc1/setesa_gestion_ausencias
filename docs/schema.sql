@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS solicitud (
     fecha_resolucion  TIMESTAMP,
     id_resuelve       INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
     CONSTRAINT solicitud_resolucion_check CHECK (
-        resolucion IN ('Aprobada', 'Denegada')
+        resolucion IN ('Aprobada', 'Denegada', 'Retirada')
     ),
     CONSTRAINT solicitud_finalizada_resolucion_check CHECK (
         (estado_workflow = 'Finalizada') = (resolucion IS NOT NULL)
