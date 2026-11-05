@@ -9,7 +9,7 @@ from src.core.database import get_engine
 from src.core.logging_config import obtener_logger
 from src.services.documentos import generar_pdf_solicitud, preparar_pdf_descarga
 from src.core.security import rol_autorizado
-from src.core.catalogos import OPCIONES_AUSENCIA
+from src.core.motivos import opciones_activas
 from src.core.feriados import fechas_feriados
 from src.core.perfil import obtener_perfil
 from src.core.usuarios import listar_coordinadores
@@ -165,7 +165,7 @@ def mostrar_formulario():
                 fecha_inicio = st.date_input("Fecha de Inicio (Del:)", min_value=datetime.date.today())
             with col2:
                 codigo = st.text_input("CÓDIGO:", perfil.get("codigo_empleado", ""))
-                tipo_ausencia = st.selectbox("NATURALEZA DE LA ACCIÓN:", OPCIONES_AUSENCIA)
+                tipo_ausencia = st.selectbox("NATURALEZA DE LA ACCIÓN:", opciones_activas())
                 fecha_fin = st.date_input(
                     "Fecha de Fin (Al:)",
                     value=fecha_inicio,

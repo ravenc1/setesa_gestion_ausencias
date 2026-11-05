@@ -5,6 +5,13 @@ import pandas as pd
 import streamlit as st
 
 from src.core.database import get_engine
+from src.core.indicadores import (
+    calcular_tiempos,
+    formatear_duracion,
+    obtener_tiempos_resolucion,
+    obtener_usuarios,
+    resumen_usuarios,
+)
 from src.core.logging_config import obtener_logger
 from src.core.reportes import (
     calcular_kpis,
@@ -100,6 +107,50 @@ def _mostrar_kpis(kpis):
     st.caption(
         f"Resoluciones: ✅ {kpis['aprobadas']} aprobada(s) · "
         f"⛔ {kpis['denegadas']} denegada(s)."
+    )
+
+
+def _mostrar_indicadores_usuarios():
+    """Usuarios vigentes e inactivos (tesis: porcentaje de usuarios inactivos)."""
+    try:
+        resumen = resumen_usuarios(obtener_usuarios())
+    except Exception as e:
+        logger.warning("No se pudieron calcular los indicadores de usuarios: %s", e)
+        return
+    if not resumen["total"]:
+        return
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Usuarios vigentes", resumen["vigentes"])
+    col2.metric("Usuarios inactivos", resumen["inactivos"])
+    col3.metric("% de inactivos", f"{resumen['pct_inactivos']}%")
+    col4.metric(
+        "Por vencer (30 días)",
+        resumen["por_vencer"],
+        help="Consultores y Contabilidad que deben actualizar «Mis datos».",
+    )
+
+
+def _mostrar_tiempos():
+    """Tiempo promedio de aprobación, total y por etapa."""
+    try:
+        tiempos = calcular_tiempos(obtener_tiempos_resolucion())
+    except Exception as e:
+        logger.warning("No se pudieron calcular los tiempos de aprobación: %s", e)
+        return
+    if not tiempos["resueltas"]:
+        st.caption("⏱️ Aún no hay expedientes resueltos para calcular tiempos.")
+        return
+    col1, col2, col3 = st.columns(3)
+    col1.metric(
+        "⏱️ Tiempo promedio de aprobación",
+        formatear_duracion(tiempos["total"]),
+        help=f"De la solicitud a su resolución; {tiempos['resueltas']} expediente(s) resuelto(s).",
+    )
+    col2.metric("Hasta el visto bueno del banco", formatear_duracion(tiempos["banco"]))
+    col3.metric("Etapa de Gerencia", formatear_duracion(tiempos["gerencia"]))
+    st.caption(
+        f"Aprobadas: {formatear_duracion(tiempos['aprobadas'])} · "
+        f"Denegadas: {formatear_duracion(tiempos['denegadas'])}."
     )
 
 
@@ -256,6 +307,8 @@ def mostrar_dashboard():
         "personal externo."
     )
 
+    _mostrar_indicadores_usuarios()
+
     df_solicitudes = obtener_solicitudes()
 
     if df_solicitudes.empty:
@@ -275,6 +328,7 @@ def mostrar_dashboard():
     kpis = calcular_kpis(df_solicitudes)
     _mostrar_alertas(kpis)
     _mostrar_kpis(kpis)
+    _mostrar_tiempos()
 
     st.write("---")
     st.markdown("#### 🔎 Repositorio Histórico y Filtros")
