@@ -28,6 +28,11 @@ def cur():
     conn = psycopg2.connect(os.environ["DATABASE_URL"])
     cursor = conn.cursor()
     try:
+        # Columnas de la Fase 14, por si la base aún no está migrada.
+        cursor.execute(
+            "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS "
+            "fecha_actualizacion_datos TIMESTAMP DEFAULT NOW()"
+        )
         cursor.execute(SQL_TRIGGERS)
         yield cursor
     finally:
@@ -48,14 +53,15 @@ def _rechaza(cur, sql, params=None):
     return False
 
 
-def _usuario(cur, rol, actividad="NOW()", vigente=True):
+def _usuario(cur, rol, actualizado="NOW()", vigente=True):
+    """Crea un usuario; ``actualizado`` es su última actualización de datos."""
     cur.execute(
         f"""
         INSERT INTO usuario
             (id_rol, nombre_completo, correo_institucional, password_hash,
-             estado_vigencia, ultima_actividad)
+             estado_vigencia, ultima_actividad, fecha_actualizacion_datos)
         SELECT id_rol, 'PYTEST ' || %s, 'pytest_trg_' || md5(random()::text)
-               || '@example.com', 'x', %s, {actividad}
+               || '@example.com', 'x', %s, NOW(), {actualizado}
           FROM rol WHERE nombre_rol = %s
         RETURNING id_usuario
         """,
@@ -137,7 +143,7 @@ def test_registro_rechaza_usuario_dado_de_baja(cur, actores):
 
 
 def test_registro_rechaza_usuario_vencido_sin_depurar(cur, actores):
-    vencido = _usuario(cur, "Consultor", actividad="NOW() - INTERVAL '7 months'")
+    vencido = _usuario(cur, "Consultor", actualizado="NOW() - INTERVAL '7 months'")
     assert _rechaza(cur, INSERT_SOLICITUD, (vencido, "Ingresada", actores["coord"]))
 
 
@@ -246,13 +252,14 @@ def test_historial_es_inmutable(cur, actores):
 # Vigencia automática (sección 3.6)
 # ---------------------------------------------------------------------------
 def test_actividad_de_usuario_vencido_aplica_baja_logica(cur):
-    vencido = _usuario(cur, "Consultor", actividad="NOW() - INTERVAL '7 months'")
+    vencido = _usuario(cur, "Consultor", actualizado="NOW() - INTERVAL '7 months'")
     cur.execute(
-        "UPDATE usuario SET ultima_actividad = NOW() WHERE id_usuario = %s",
+        "UPDATE usuario SET ultima_actividad = NOW() + INTERVAL '1 second' "
+        "WHERE id_usuario = %s",
         (vencido,),
     )
     cur.execute(
-        "SELECT estado_vigencia, ultima_actividad < NOW() - INTERVAL '6 months' "
+        "SELECT estado_vigencia, fecha_actualizacion_datos < NOW() - INTERVAL '6 months' "
         "FROM usuario WHERE id_usuario = %s",
         (vencido,),
     )
@@ -265,23 +272,78 @@ def test_actividad_de_usuario_vencido_aplica_baja_logica(cur):
     assert cur.fetchone()[0] == 1
 
 
-def test_roles_protegidos_no_vencen(cur):
-    admin = _usuario(cur, "Administrador", actividad="NOW() - INTERVAL '7 months'")
+def test_actualizar_datos_a_tiempo_renueva_el_plazo(cur):
+    a_tiempo = _usuario(cur, "Consultor", actualizado="NOW() - INTERVAL '5 months'")
     cur.execute(
-        "UPDATE usuario SET ultima_actividad = NOW() WHERE id_usuario = %s",
-        (admin,),
+        "UPDATE usuario SET fecha_actualizacion_datos = NOW() WHERE id_usuario = %s",
+        (a_tiempo,),
     )
-    cur.execute("SELECT estado_vigencia FROM usuario WHERE id_usuario = %s", (admin,))
-    assert cur.fetchone()[0] is True
+    cur.execute(
+        "SELECT estado_vigencia, setesa_usuario_vigente(%s) FROM usuario "
+        "WHERE id_usuario = %s",
+        (a_tiempo, a_tiempo),
+    )
+    assert cur.fetchone() == (True, True)
+
+
+def test_contabilidad_tambien_vence(cur):
+    conta = _usuario(cur, "Contabilidad", actualizado="NOW() - INTERVAL '7 months'")
+    cur.execute("SELECT setesa_usuario_vigente(%s)", (conta,))
+    assert cur.fetchone()[0] is False
+
+
+@pytest.mark.parametrize("rol", ["Coordinador GTC", "Administrador", "IT"])
+def test_roles_sin_actualizacion_no_vencen(cur, rol):
+    usuario = _usuario(cur, rol, actualizado="NOW() - INTERVAL '7 months'")
+    cur.execute(
+        "UPDATE usuario SET ultima_actividad = NOW() + INTERVAL '1 second' "
+        "WHERE id_usuario = %s",
+        (usuario,),
+    )
+    cur.execute(
+        "SELECT estado_vigencia, setesa_usuario_vigente(%s) FROM usuario "
+        "WHERE id_usuario = %s",
+        (usuario, usuario),
+    )
+    assert cur.fetchone() == (True, True)
 
 
 def test_depuracion_programada(cur):
-    vencido = _usuario(cur, "Consultor", actividad="NOW() - INTERVAL '7 months'")
+    vencido = _usuario(cur, "Consultor", actualizado="NOW() - INTERVAL '7 months'")
     reciente = _usuario(cur, "Consultor")
+    coordinador = _usuario(
+        cur, "Coordinador GTC", actualizado="NOW() - INTERVAL '7 months'"
+    )
     cur.execute("SELECT setesa_depurar_vigencia()")
     assert cur.fetchone()[0] >= 1
     cur.execute(
-        "SELECT id_usuario, estado_vigencia FROM usuario WHERE id_usuario IN (%s, %s)",
-        (vencido, reciente),
+        "SELECT id_usuario, estado_vigencia FROM usuario "
+        "WHERE id_usuario IN (%s, %s, %s)",
+        (vencido, reciente, coordinador),
     )
-    assert dict(cur.fetchall()) == {vencido: False, reciente: True}
+    assert dict(cur.fetchall()) == {
+        vencido: False,
+        reciente: True,
+        coordinador: True,
+    }
+
+
+def test_it_puede_reasignar(cur, actores):
+    it = _usuario(cur, "IT")
+    id_sol = _solicitud_pendiente(cur, actores)
+    cur.execute(
+        "UPDATE solicitud SET id_coordinador = %s WHERE id_solicitud = %s",
+        (actores["coord_otro"], id_sol),
+    )
+    assert not _rechaza(
+        cur,
+        "INSERT INTO solicitud_historial (id_solicitud, estado_anterior, "
+        "estado_nuevo, id_usuario) VALUES (%s, %s, %s, %s)",
+        (id_sol, PEND_COORD, PEND_COORD, it),
+    )
+    assert _rechaza(
+        cur,
+        "INSERT INTO solicitud_historial (id_solicitud, estado_anterior, "
+        "estado_nuevo, id_usuario) VALUES (%s, %s, %s, %s)",
+        (id_sol, PEND_COORD, PEND_COORD, actores["consultor"]),
+    )

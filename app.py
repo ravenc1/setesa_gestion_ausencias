@@ -11,6 +11,7 @@ from src.features import (
     coordinador,
     feriados,
     gestion_usuarios,
+    mis_datos,
     reasignacion,
 )
 
@@ -31,8 +32,9 @@ else:
     if not usuario_activo(st.session_state.get('id_usuario')):
         st.session_state.clear()
         st.warning(
-            "Su acceso fue desactivado por inactividad (baja lógica). "
-            "Contacte a Gerencia para solicitar la reactivación."
+            "Su acceso fue desactivado (baja lógica), por no actualizar sus "
+            "datos en el plazo de 6 meses o por decisión administrativa. "
+            "Contacte a IT para solicitar la reactivación."
         )
         auth.show_login()
         st.stop()
@@ -41,13 +43,26 @@ else:
     st.sidebar.write(f"**Nombre:** {st.session_state['nombre']}")
     st.sidebar.write(f"**Rol RBAC:** {st.session_state['rol']}")
     st.sidebar.write("---")
-    
+
+    # Fase 14: Consultor y Contabilidad tienen además la sección "Mis datos".
+    seccion = None
+    if st.session_state['rol'] in ('Consultor', 'Contabilidad'):
+        seccion = st.sidebar.radio(
+            "Sección", ["Principal", "🪪 Mis datos"], key="seccion_menu"
+        )
+        st.sidebar.write("---")
+
     if st.sidebar.button("Cerrar Sesión", width="stretch"):
         st.session_state.clear()
         st.rerun()
         
+    mis_datos.mostrar_aviso_actualizacion()
+
     # ENRUTAMIENTO POR ROLES
-    if st.session_state['rol'] == 'Consultor':
+    if seccion == "🪪 Mis datos":
+        mis_datos.mostrar_mis_datos()
+
+    elif st.session_state['rol'] == 'Consultor':
         st.title("Panel Operativo - Consultor Técnico")
         registro.mostrar_formulario()
         

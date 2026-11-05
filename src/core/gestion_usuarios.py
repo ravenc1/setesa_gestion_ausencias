@@ -176,6 +176,10 @@ def listar_usuarios():
                r.nombre_rol,
                COALESCE(u.estado_vigencia, TRUE) AS estado_vigencia,
                u.ultima_actividad,
+               CASE WHEN r.nombre_rol IN ('Consultor', 'Contabilidad')
+                    THEN (u.fecha_actualizacion_datos
+                          + INTERVAL '6 months')::date
+               END AS fecha_limite_datos,
                u.dias_vacaciones_asignados,
                COALESCE(v.dias_usados, 0) AS dias_usados,
                u.dias_vacaciones_asignados - COALESCE(v.dias_usados, 0)
@@ -402,7 +406,8 @@ def cambiar_estado_usuario(id_ejecutor, id_usuario, activo):
                         """
                         UPDATE usuario
                            SET estado_vigencia = TRUE,
-                               ultima_actividad = NOW()
+                               ultima_actividad = NOW(),
+                               fecha_actualizacion_datos = NOW()
                          WHERE id_usuario = %s
                         """,
                         (id_usuario,),

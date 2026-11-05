@@ -81,8 +81,10 @@ def escenario():
                     """
                     INSERT INTO usuario
                         (id_rol, nombre_completo, correo_institucional,
-                         password_hash, estado_vigencia, ultima_actividad)
-                    VALUES (%s, %s, %s, %s, TRUE, NOW() - %s::interval)
+                         password_hash, estado_vigencia, ultima_actividad,
+                         fecha_actualizacion_datos)
+                    VALUES (%s, %s, %s, %s, TRUE, NOW() - %s::interval,
+                            NOW() - %s::interval)
                     RETURNING id_usuario
                     """,
                     (
@@ -90,6 +92,7 @@ def escenario():
                         f"PYTEST {clave} {marca}",
                         correo,
                         hash_password(PASSWORD),
+                        intervalo,
                         intervalo,
                     ),
                 )

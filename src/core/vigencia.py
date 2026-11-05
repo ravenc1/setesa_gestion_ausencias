@@ -1,11 +1,15 @@
 # Servicio del algoritmo de vigencia semestral (RF-05 / CU-06).
 #
-# Reglas:
-#   1. Un usuario activo con más de 6 meses sin actividad pasa a baja lógica
+# Reglas (tesis 1.5 y objetivo c: "actualización de datos cada 6 meses"):
+#   1. Consultor y Contabilidad deben confirmar sus datos (módulo "Mis datos")
+#      al menos cada 6 meses. Si no lo hacen, pasan a baja lógica
 #      (estado_vigencia = FALSE), sin borrar su historial.
-#   2. Los roles administrativos nunca se desactivan automáticamente.
+#   2. Coordinador GTC, Administrador e IT no actualizan datos: no vencen
+#      automáticamente; IT los da de baja manualmente cuando corresponde.
 #   3. Cada ejecución y cada reactivación quedan auditadas en vigencia_log.
-#   4. La actividad se actualiza en login y en cada escritura relevante.
+#   4. ultima_actividad se sigue registrando (login y escrituras) para
+#      auditoría, pero ya no define la vigencia.
+#   5. Los triggers de docs/triggers.sql aplican la misma regla en la base.
 #
 # Este módulo no importa Streamlit: puede usarse desde la UI y desde la CLI.
 
@@ -17,6 +21,10 @@ from src.core.logging_config import obtener_logger
 logger = obtener_logger("setesa.vigencia")
 
 MESES_VIGENCIA = 6
+# Días antes del vencimiento en que empieza el aviso de actualización.
+DIAS_AVISO = 30
+# Roles que deben actualizar sus datos cada 6 meses.
+ROLES_CON_ACTUALIZACION = ("Consultor", "Contabilidad")
 # IT también se protege: si la única cuenta de gestión se diera de baja por
 # inactividad, nadie podría crear o reactivar usuarios.
 ROLES_PROTEGIDOS = ("Administrador", "IT")
@@ -71,23 +79,49 @@ def usuario_activo(id_usuario):
 
 
 def _consulta_inactivos(id_excluido=None):
-    # Los roles protegidos se expanden como parámetros escalares para que la
-    # consulta funcione igual con psycopg2 y con SQLAlchemy (sin arrays).
-    marcadores = ", ".join(["%s"] * len(ROLES_PROTEGIDOS))
+    # Los roles se expanden como parámetros escalares para que la consulta
+    # funcione igual con psycopg2 y con SQLAlchemy (sin arrays).
+    marcadores = ", ".join(["%s"] * len(ROLES_CON_ACTUALIZACION))
     query = f"""
         SELECT u.id_usuario, u.nombre_completo, u.correo_institucional,
-               u.ultima_actividad, r.nombre_rol
+               u.fecha_actualizacion_datos, r.nombre_rol
         FROM usuario u
         JOIN rol r ON u.id_rol = r.id_rol
         WHERE u.estado_vigencia = TRUE
-          AND u.ultima_actividad < CURRENT_DATE - INTERVAL '6 months'
-          AND r.nombre_rol NOT IN ({marcadores})
+          AND u.fecha_actualizacion_datos < CURRENT_DATE - INTERVAL '6 months'
+          AND r.nombre_rol IN ({marcadores})
     """
-    params = list(ROLES_PROTEGIDOS)
+    params = list(ROLES_CON_ACTUALIZACION)
     if id_excluido is not None:
         query += " AND u.id_usuario <> %s"
         params.append(id_excluido)
     return query, tuple(params)
+
+
+def obtener_por_vencer(dias=DIAS_AVISO):
+    """Usuarios vigentes cuyo plazo de actualización vence en ``dias`` o menos."""
+    engine = get_engine()
+    if engine is None:
+        return pd.DataFrame()
+    marcadores = ", ".join(["%s"] * len(ROLES_CON_ACTUALIZACION))
+    query = f"""
+        SELECT u.id_usuario, u.nombre_completo, u.correo_institucional,
+               r.nombre_rol, u.fecha_actualizacion_datos,
+               (u.fecha_actualizacion_datos + INTERVAL '6 months')::date
+                   AS fecha_limite,
+               (u.fecha_actualizacion_datos + INTERVAL '6 months')::date
+                   - CURRENT_DATE AS dias_restantes
+        FROM usuario u
+        JOIN rol r ON u.id_rol = r.id_rol
+        WHERE u.estado_vigencia = TRUE
+          AND r.nombre_rol IN ({marcadores})
+          AND (u.fecha_actualizacion_datos + INTERVAL '6 months')::date
+              - CURRENT_DATE <= %s
+        ORDER BY dias_restantes ASC, u.nombre_completo ASC
+    """
+    return pd.read_sql_query(
+        query, engine, params=tuple(ROLES_CON_ACTUALIZACION) + (dias,)
+    )
 
 
 def obtener_inactivos(id_excluido=None):
@@ -97,7 +131,9 @@ def obtener_inactivos(id_excluido=None):
         return pd.DataFrame()
     query, params = _consulta_inactivos(id_excluido)
     return pd.read_sql_query(
-        query + " ORDER BY u.ultima_actividad ASC", engine, params=params
+        query + " ORDER BY u.fecha_actualizacion_datos ASC",
+        engine,
+        params=params,
     )
 
 
@@ -135,7 +171,8 @@ def ejecutar_depuracion(id_ejecutor=None, accion=ACCION_DEPURACION):
             with conn.cursor() as cursor:
                 query, params = _consulta_inactivos(id_excluido=id_ejecutor)
                 cursor.execute(
-                    query + " ORDER BY u.ultima_actividad ASC FOR UPDATE OF u",
+                    query
+                    + " ORDER BY u.fecha_actualizacion_datos ASC FOR UPDATE OF u",
                     params,
                 )
                 filas = cursor.fetchall()
@@ -144,7 +181,7 @@ def ejecutar_depuracion(id_ejecutor=None, accion=ACCION_DEPURACION):
                     "id_usuario",
                     "nombre_completo",
                     "correo_institucional",
-                    "ultima_actividad",
+                    "fecha_actualizacion_datos",
                     "nombre_rol",
                 ]
                 df_afectados = pd.DataFrame(filas, columns=columnas)
@@ -204,7 +241,8 @@ def reactivar_usuario(id_usuario, id_ejecutor=None):
                 cursor.execute(
                     """
                     UPDATE usuario
-                    SET estado_vigencia = TRUE, ultima_actividad = NOW()
+                    SET estado_vigencia = TRUE, ultima_actividad = NOW(),
+                        fecha_actualizacion_datos = NOW()
                     WHERE id_usuario = %s
                     """,
                     (id_usuario,),
