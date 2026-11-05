@@ -640,6 +640,22 @@ objetivo c) y los coordinadores del banco quedan fuera de la baja automática.
 
 ---
 
+### Fase 15 — Correo automático de recordatorio
+
+- [x] **Envío SMTP** desde la cuenta de SETESA con contraseña de aplicación (`src/services/correo.py`).
+- [x] **Etapas** 30, 15, 7 y 1 día(s) antes del plazo; a Consultores y a Contabilidad y RR.HH. vigentes.
+- [x] **Sin duplicados** (`aviso_actualizacion`, único por usuario, plazo y etapa); si la tarea no corre un día, al siguiente envía solo la etapa en curso.
+- [x] **Tarea diaria** en GitHub Actions (`.github/workflows/recordatorios.yml`, 08:00 de Guatemala) con ejecución manual en modo simulación.
+- [x] **Panel de IT**: últimos correos enviados o fallidos en «Por vencer».
+- [x] Guía `docs/CORREO.md` (contraseña de aplicación, pooler de Supabase y secretos de GitHub).
+- [x] Migración `scripts/migracion_fase15.py` y pruebas `tests/test_avisos.py` (21).
+
+**Criterio de aceptación:** un consultor con el plazo por vencer recibe un
+correo por etapa sin entrar al sistema. ✅ **Cumplido** (pendiente de cargar
+los secretos de la cuenta de SETESA en GitHub).
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
