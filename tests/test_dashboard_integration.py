@@ -8,7 +8,6 @@ import base64
 import datetime
 import io
 import os
-from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -111,7 +110,6 @@ def test_repositorio_filtros_y_descarga_pdf_final():
         f"PYTEST_DASHBOARD_{uuid4().hex[:10]}",
         _firma_b64(),
     )
-    ruta = None
     try:
         cambiar_estado(
             id_solicitud,
@@ -145,15 +143,14 @@ def test_repositorio_filtros_y_descarga_pdf_final():
         )
         assert id_solicitud in set(filtrado["id_solicitud"].tolist())
 
-        ruta, contenido = preparar_pdf_descarga(id_solicitud)
-        assert Path(ruta).exists()
+        nombre, contenido = preparar_pdf_descarga(id_solicitud)
+        assert nombre.endswith("_final.pdf")
         assert contenido.startswith(b"%PDF")
-        assert contenido.count(b"/Subtype /Image") == 3
+        # Logo de SETESA + las tres firmas (Fase 19).
+        assert contenido.count(b"/Subtype /Image") == 4
 
         datos = obtener_solicitud(id_solicitud)
-        assert Path(datos["ruta_pdf"]) == Path(ruta)
+        assert datos["pdf_inmutable"] is True
+        assert datos["ruta_pdf"].startswith(f"pdf/{id_solicitud}/final_")
     finally:
-        if ruta is not None:
-            Path(ruta).unlink(missing_ok=True)
-            Path(ruta).with_suffix(".pdf.sha256").unlink(missing_ok=True)
         _eliminar(id_solicitud)
