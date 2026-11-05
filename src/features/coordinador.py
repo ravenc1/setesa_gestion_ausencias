@@ -199,7 +199,7 @@ def mostrar_panel_coordinador():
                     "success",
                     f"Expediente {id_seleccionado} "
                     f"{'denegado' if denegar else 'aprobado'} y firmado. "
-                    f"PDF actualizado en {ruta}.",
+                    f"PDF guardado en el repositorio ({ruta}).",
                 )
             except Exception as e:
                 st.session_state["flash_coordinador"] = (

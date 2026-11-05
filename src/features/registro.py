@@ -7,7 +7,7 @@ from src.services.utils_firma import canvas_to_base64
 from src.core.crypto import descifrar_dataframe
 from src.core.database import get_engine
 from src.core.logging_config import obtener_logger
-from src.services.documentos import generar_pdf_solicitud
+from src.services.documentos import generar_pdf_solicitud, preparar_pdf_descarga
 from src.core.security import rol_autorizado
 from src.core.catalogos import OPCIONES_AUSENCIA
 from src.core.feriados import fechas_feriados
@@ -105,8 +105,15 @@ def mostrar_formulario():
             # Mensaje de éxito actualizado
             st.success("✅ ¡Su solicitud fue firmada electrónicamente y enviada al Coordinador GTC para su visto bueno!")
             if st.session_state.pdf_generado:
-                with open(st.session_state.pdf_generado, "rb") as f:
-                    st.download_button("📥 Descargar Comprobante (PDF)", data=f, file_name="Accion_Personal_SETESA.pdf", mime="application/pdf", type="primary")
+                # Fase 17: el PDF se lee del repositorio persistente.
+                try:
+                    nombre_pdf, contenido_pdf = preparar_pdf_descarga(
+                        st.session_state.pdf_generado
+                    )
+                except Exception as e:
+                    st.warning(f"No se pudo recuperar el PDF: {e}")
+                else:
+                    st.download_button("📥 Descargar Comprobante (PDF)", data=contenido_pdf, file_name=nombre_pdf, mime="application/pdf", type="primary")
             else:
                 st.warning("La solicitud quedó registrada, pero el PDF no está disponible. Consulte la pestaña de historial.")
             st.write("---")
@@ -242,15 +249,18 @@ def mostrar_formulario():
                             if id_solicitud:
                                 # El servicio toma los datos ya persistidos y
                                 # guarda la ruta en solicitud.ruta_pdf.
-                                ruta = None
+                                pdf_ok = False
                                 try:
-                                    ruta = generar_pdf_solicitud(id_solicitud)
+                                    generar_pdf_solicitud(id_solicitud)
+                                    pdf_ok = True
                                 except Exception as e:
                                     st.warning(
                                         "La solicitud se guardó, pero no se pudo "
                                         f"generar el PDF: {e}"
                                     )
-                                st.session_state.pdf_generado = ruta or ""
+                                st.session_state.pdf_generado = (
+                                    id_solicitud if pdf_ok else ""
+                                )
                                 st.session_state.solicitud_enviada = True
                                 st.session_state.mostrar_canvas_firma = False
                                 st.rerun()
@@ -276,13 +286,16 @@ def mostrar_formulario():
             if st.button("Generar y Descargar PDF Actualizado"):
                 # Regeneración desde la BD: incluye las firmas ya capturadas y
                 # actualiza solicitud.ruta_pdf.
+                # Un borrador se regenera; el PDF final (inmutable) se
+                # entrega tal como quedó sellado.
                 try:
-                    pdf_historial = generar_pdf_solicitud(id_descarga)
+                    nombre_pdf, contenido_pdf = preparar_pdf_descarga(
+                        id_descarga, regenerar=True
+                    )
                 except Exception as e:
                     st.error(f"No se pudo generar el PDF: {e}")
                 else:
-                    with open(pdf_historial, "rb") as f:
-                        st.download_button(f"📥 Descargar Expediente #{id_descarga} ({fila['estado_workflow']})", data=f, file_name=f"Expediente_{id_descarga}.pdf", mime="application/pdf", type="primary")
+                    st.download_button(f"📥 Descargar Expediente #{id_descarga} ({fila['estado_workflow']})", data=contenido_pdf, file_name=nombre_pdf, mime="application/pdf", type="primary")
 
             # R-11: aviso auditable al Coordinador GTC del banco.
             st.write("---")
