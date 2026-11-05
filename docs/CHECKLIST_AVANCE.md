@@ -803,6 +803,14 @@ estilos usan sus selectores `data-testid`, por eso la versión está fijada en
 Render se crea en la región de Oregón (junto a Supabase, `us-west-2`) la distancia a
 la base de datos es de pocos milisegundos.
 
+### Fase 25 — Retiro de solicitudes y avisos por correo del flujo
+
+- [x] **Retirar solicitud** (extensión que no está en la tesis; se informa al usuario): el consultor dueño puede retirar su solicitud mientras no tenga el visto bueno del banco. El expediente queda *Finalizado* con resolución **Retirada** (se mantienen los 4 estados), con motivo obligatorio cifrado y registro en el historial.
+- [x] Los días de vacaciones vuelven al saldo; no se genera PDF oficial; no cuenta en los tiempos de resolución ni avisa a Contabilidad como resolución.
+- [x] La base lo exige (triggers): solo el dueño, solo en esas etapas, con motivo; migración `scripts/migracion_fase25.py`.
+- [x] **Avisos por correo** (`src/core/avisos_flujo.py`): solicitud nueva → Coordinador GTC; visto bueno → Gerencia; retiro → Coordinador GTC; resolución → consultor y Contabilidad. Solo número, persona, tipo y fechas (nunca explicación, motivo ni firmas); mejor esfuerzo y en segundo plano: si el correo falla, el flujo sigue.
+- [x] Pruebas `tests/test_fase25.py` (15); las pruebas nunca envían correo real (`SETESA_SIN_CORREO`).
+
 ---
 
 ## 9. Definición de “terminado” (DoD) para cada fase

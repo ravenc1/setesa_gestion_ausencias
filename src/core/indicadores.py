@@ -43,6 +43,7 @@ def obtener_tiempos_resolucion():
                    AS fecha_banco
         FROM solicitud s
         WHERE s.estado_workflow = 'Finalizada' AND s.fecha_resolucion IS NOT NULL
+          AND s.resolucion IS DISTINCT FROM 'Retirada'
         """,
         engine,
         parse_dates=["fecha_creacion", "fecha_resolucion", "fecha_banco"],

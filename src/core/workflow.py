@@ -30,13 +30,26 @@ TRANSICIONES = {
 # denegación cierra el flujo desde su etapa y exige motivo y firma.
 RESOLUCION_APROBADA = "Aprobada"
 RESOLUCION_DENEGADA = "Denegada"
-RESOLUCIONES = (RESOLUCION_APROBADA, RESOLUCION_DENEGADA)
+# Fase 25 (extensión, no está en la tesis): el consultor puede retirar su propia
+# solicitud antes del visto bueno del banco. Mantiene los 4 estados: el
+# expediente queda Finalizado con resolución "Retirada" (sin PDF oficial).
+RESOLUCION_RETIRADA = "Retirada"
+RESOLUCIONES = (RESOLUCION_APROBADA, RESOLUCION_DENEGADA, RESOLUCION_RETIRADA)
 
 # Etapas desde las que se puede denegar, y quién lo hace.
 ETAPAS_DENEGACION = {
     ESTADO_PENDIENTE_FIRMA_COORDINADOR: "Coordinador GTC",
     ESTADO_PENDIENTE_APROBACION_GERENCIA: "Administrador",
 }
+
+
+# Etapas en las que el consultor dueño aún puede retirar su solicitud.
+ETAPAS_RETIRO = (ESTADO_INGRESADA, ESTADO_PENDIENTE_FIRMA_COORDINADOR)
+
+
+def puede_retirar(estado_actual):
+    """Indica si el consultor puede retirar el expediente en su etapa actual."""
+    return estado_actual in ETAPAS_RETIRO
 
 
 def puede_denegar(estado_actual):

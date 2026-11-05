@@ -220,6 +220,10 @@ BEGIN
             OR (OLD.estado_workflow = 'Pendiente de Firma Coordinador'
                 AND NEW.estado_workflow = 'Finalizada'
                 AND NEW.resolucion = 'Denegada')
+            -- Fase 25: el consultor retira su solicitud antes del visto bueno.
+            OR (OLD.estado_workflow IN ('Ingresada', 'Pendiente de Firma Coordinador')
+                AND NEW.estado_workflow = 'Finalizada'
+                AND NEW.resolucion = 'Retirada')
         ) THEN
             RAISE EXCEPTION 'SETESA: transición no permitida: % -> %.',
                 OLD.estado_workflow, NEW.estado_workflow;
@@ -232,10 +236,18 @@ BEGIN
         -- Fase 16: todo expediente finalizado lleva su resolución.
         IF NEW.estado_workflow = 'Finalizada' THEN
             IF NEW.resolucion IS NULL THEN
-                RAISE EXCEPTION 'SETESA: el expediente finalizado requiere una resolución (Aprobada o Denegada).';
+                RAISE EXCEPTION 'SETESA: el expediente finalizado requiere una resolución (Aprobada, Denegada o Retirada).';
             END IF;
             IF NEW.resolucion = 'Aprobada' AND NEW.firma_gerencia IS NULL THEN
                 RAISE EXCEPTION 'SETESA: la aprobación final requiere la firma de Gerencia.';
+            END IF;
+            IF NEW.resolucion = 'Retirada' THEN
+                IF NEW.motivo_resolucion IS NULL THEN
+                    RAISE EXCEPTION 'SETESA: el retiro requiere un motivo.';
+                END IF;
+                IF NEW.id_resuelve IS DISTINCT FROM OLD.id_usuario THEN
+                    RAISE EXCEPTION 'SETESA: solo el consultor dueño retira su solicitud.';
+                END IF;
             END IF;
             IF NEW.resolucion = 'Denegada' THEN
                 IF NEW.motivo_resolucion IS NULL THEN
@@ -354,9 +366,10 @@ DECLARE
     v_dueno       INTEGER;
     v_coordinador INTEGER;
     v_rol         VARCHAR;
+    v_resolucion  VARCHAR;
 BEGIN
-    SELECT estado_workflow, id_usuario, id_coordinador
-      INTO v_estado, v_dueno, v_coordinador
+    SELECT estado_workflow, id_usuario, id_coordinador, resolucion
+      INTO v_estado, v_dueno, v_coordinador, v_resolucion
       FROM solicitud
      WHERE id_solicitud = NEW.id_solicitud;
 
@@ -385,6 +398,11 @@ BEGIN
     ELSIF NEW.estado_nuevo = 'Pendiente de Aprobación Gerencia' THEN
         IF NEW.id_usuario IS DISTINCT FROM v_coordinador THEN
             RAISE EXCEPTION 'SETESA: solo el Coordinador GTC asignado da el visto bueno.';
+        END IF;
+    ELSIF NEW.estado_nuevo = 'Finalizada' AND v_resolucion = 'Retirada' THEN
+        -- Fase 25: retiro por el consultor dueño.
+        IF NEW.id_usuario <> v_dueno THEN
+            RAISE EXCEPTION 'SETESA: solo el consultor dueño retira su solicitud.';
         END IF;
     ELSIF NEW.estado_anterior = 'Pendiente de Firma Coordinador'
           AND NEW.estado_nuevo = 'Finalizada' THEN
@@ -513,7 +531,8 @@ DECLARE
     v_mensaje TEXT;
 BEGIN
     IF NEW.estado_workflow = 'Finalizada'
-       AND OLD.estado_workflow IS DISTINCT FROM 'Finalizada' THEN
+       AND OLD.estado_workflow IS DISTINCT FROM 'Finalizada'
+       AND NEW.resolucion IS DISTINCT FROM 'Retirada' THEN
         SELECT 'Expediente #' || NEW.id_solicitud || ' de ' || u.nombre_completo
                || ' (' || NEW.tipo_ausencia || ', del '
                || to_char(NEW.fecha_inicio, 'DD/MM/YYYY') || ' al '

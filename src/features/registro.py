@@ -17,7 +17,14 @@ from src.core.usuarios import listar_coordinadores
 from src.core.utils import calcular_dias_habiles
 from src.core.vacaciones import TIPO_VACACION, obtener_saldo_vacaciones
 from src.core.validaciones import ValidacionError
-from src.core.solicitudes import registrar_solicitud, obtener_historial
+from src.core.solicitudes import (
+    MotivoRequerido,
+    NoEsDuenoSolicitud,
+    TransicionInvalida,
+    obtener_historial,
+    registrar_solicitud,
+    retirar_solicitud,
+)
 from src.core.evidencias import (
     EvidenciaError,
     evidencia_obligatoria,
@@ -30,7 +37,7 @@ from src.core.recordatorios import (
     registrar_recordatorio,
     ultimo_recordatorio,
 )
-from src.core.workflow import ESTADO_PENDIENTE_FIRMA_COORDINADOR
+from src.core.workflow import ESTADO_PENDIENTE_FIRMA_COORDINADOR, puede_retirar
 
 logger = obtener_logger("setesa.registro")
 
@@ -299,6 +306,9 @@ def mostrar_formulario():
 
     with tab2:
         st.markdown("#### Historial de Mis Solicitudes (Detalle Completo)")
+        aviso_retiro = st.session_state.pop("flash_retiro", None)
+        if aviso_retiro:
+            st.success(aviso_retiro)
         df_historial = obtener_mis_solicitudes(st.session_state['id_usuario'])
         
         if not df_historial.empty:
@@ -310,7 +320,12 @@ def mostrar_formulario():
             id_descarga = st.selectbox("Seleccione el ID de la solicitud a descargar:", df_historial['id_solicitud'])
             fila = df_historial[df_historial['id_solicitud'] == id_descarga].iloc[0]
             
-            if st.button("Generar y Descargar PDF Actualizado"):
+            retirada = fila["resolucion"] == "Retirada"
+            if retirada:
+                st.caption(
+                    "Esta solicitud fue retirada por usted: no tiene PDF oficial."
+                )
+            if not retirada and st.button("Generar y Descargar PDF Actualizado"):
                 # Regeneración desde la BD: incluye las firmas ya capturadas y
                 # actualiza solicitud.ruta_pdf.
                 # Un borrador se regenera; el PDF final (inmutable) se
@@ -404,6 +419,52 @@ def mostrar_formulario():
                             f"Destinatario: {envio['destinatario']} "
                             f"<{envio['correo']}>"
                         )
+
+            # Fase 25: el consultor puede retirar su solicitud antes del
+            # visto bueno del banco.
+            st.write("---")
+            st.markdown("#### ↩️ Retirar solicitud")
+            if not puede_retirar(fila["estado_workflow"]):
+                st.caption(
+                    "Solo se puede retirar una solicitud que aún no tiene el "
+                    "visto bueno del Coordinador GTC."
+                )
+            else:
+                with st.form(f"form_retiro_{id_descarga}"):
+                    motivo_retiro = st.text_area(
+                        "Motivo del retiro (obligatorio)",
+                        help="Por ejemplo: error en las fechas o ya no necesito la ausencia.",
+                        height=80,
+                    )
+                    confirmar = st.checkbox(
+                        "Entiendo que el retiro es definitivo: si aún necesito la "
+                        "ausencia deberé registrar una solicitud nueva."
+                    )
+                    retirar = st.form_submit_button("↩️ Retirar solicitud")
+
+                if retirar:
+                    if not confirmar:
+                        st.warning("Marque la casilla para confirmar el retiro.")
+                    else:
+                        try:
+                            retirar_solicitud(
+                                id_descarga,
+                                st.session_state["id_usuario"],
+                                motivo_retiro,
+                            )
+                        except MotivoRequerido as e:
+                            st.warning(f"⚠️ {e}")
+                        except (NoEsDuenoSolicitud, TransicionInvalida) as e:
+                            st.error(f"No se pudo retirar: {e}")
+                        except Exception as e:
+                            logger.exception("Error al retirar la solicitud")
+                            st.error(f"No se pudo retirar la solicitud: {e}")
+                        else:
+                            st.session_state["flash_retiro"] = (
+                                f"La solicitud #{id_descarga} fue retirada. Sus "
+                                "días de vacaciones, si los había, volvieron a su saldo."
+                            )
+                            st.rerun()
 
             with st.expander(f"🕓 Historial de estados del expediente #{id_descarga}"):
                 df_movimientos = obtener_historial(id_descarga)

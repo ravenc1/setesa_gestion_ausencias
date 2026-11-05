@@ -18,6 +18,9 @@ load_dotenv(RAIZ / ".env")
 # Fase 24: sin guardado temporal de lecturas (las pruebas leen datos recién escritos).
 os.environ["SETESA_SIN_CACHE"] = "1"
 
+# Fase 25: las pruebas nunca envían avisos reales por correo.
+os.environ["SETESA_SIN_CORREO"] = "1"
+
 # Fase 17: las pruebas usan el repositorio local, nunca el bucket real.
 os.environ["SUPABASE_SERVICE_KEY"] = ""
 

@@ -114,6 +114,9 @@ def calcular_kpis(df):
         "denegadas": int(
             (df["resolucion"] == "Denegada").sum() if "resolucion" in df else 0
         ),
+        "retiradas": int(
+            (df["resolucion"] == "Retirada").sum() if "resolucion" in df else 0
+        ),
     }
 
 

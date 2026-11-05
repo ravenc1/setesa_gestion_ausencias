@@ -7,6 +7,8 @@
 
 import pandas as pd
 
+from src.core import avisos_flujo
+from src.core.avisos_flujo import avisar_en_segundo_plano
 from src.core.cache import escritura, lectura
 from src.core.crypto import cifrar, descifrar_campos
 from src.core.database import get_connection, get_engine
@@ -25,10 +27,12 @@ from src.core.workflow import (
     ETAPAS_DENEGACION,
     RESOLUCION_APROBADA,
     RESOLUCION_DENEGADA,
+    RESOLUCION_RETIRADA,
     ESTADO_FINALIZADA,
     ESTADO_INGRESADA,
     ESTADO_PENDIENTE_APROBACION_GERENCIA,
     ESTADO_PENDIENTE_FIRMA_COORDINADOR,
+    puede_retirar,
     puede_transicionar,
 )
 
@@ -259,6 +263,8 @@ def registrar_solicitud(
             fecha_inicio,
             fecha_fin,
         )
+        # Fase 25: aviso por correo al Coordinador GTC (mejor esfuerzo).
+        avisar_en_segundo_plano(avisos_flujo.NUEVA, id_solicitud)
         return id_solicitud
     finally:
         conn.close()
@@ -377,6 +383,10 @@ def cambiar_estado(
             estado_nuevo,
             id_usuario,
         )
+        if estado_nuevo == ESTADO_PENDIENTE_APROBACION_GERENCIA:
+            avisar_en_segundo_plano(avisos_flujo.VISTO_BUENO, id_solicitud)
+        elif estado_nuevo == ESTADO_FINALIZADA:
+            avisar_en_segundo_plano(avisos_flujo.FINALIZADA, id_solicitud)
         return estado_anterior, estado_nuevo
     finally:
         conn.close()
@@ -497,6 +507,104 @@ def denegar_solicitud(id_solicitud, id_usuario, motivo, firma_b64):
             estado_anterior,
             id_usuario,
         )
+        avisar_en_segundo_plano(avisos_flujo.FINALIZADA, id_solicitud)
+        return estado_anterior
+    finally:
+        conn.close()
+
+
+class NoEsDuenoSolicitud(Exception):
+    """Solo el consultor que registró la solicitud puede retirarla."""
+
+
+@escritura
+def retirar_solicitud(id_solicitud, id_usuario, motivo):
+    """El consultor dueño retira su solicitud antes del visto bueno del banco.
+
+    Cierra el expediente como Finalizado con resolución "Retirada". El motivo
+    es obligatorio y se guarda cifrado. Los días de vacaciones vuelven al
+    saldo (el saldo no cuenta solicitudes retiradas) y no se genera PDF
+    oficial. Devuelve el estado anterior.
+    """
+    texto = (motivo or "").strip()
+    if len(texto) < MOTIVO_MIN:
+        raise MotivoRequerido(
+            f"Indique el motivo del retiro (mínimo {MOTIVO_MIN} caracteres)."
+        )
+
+    conn = get_connection()
+    if not conn:
+        raise RuntimeError("No hay conexión a la base de datos.")
+
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT estado_workflow, id_usuario
+                    FROM solicitud
+                    WHERE id_solicitud = %s
+                    FOR UPDATE
+                    """,
+                    (id_solicitud,),
+                )
+                fila = cursor.fetchone()
+                if not fila:
+                    raise SolicitudNoEncontrada(
+                        f"No existe la solicitud con id {id_solicitud}."
+                    )
+                estado_anterior, id_dueno = fila
+
+                if id_dueno != id_usuario:
+                    raise NoEsDuenoSolicitud(
+                        "Solo el consultor que registró la solicitud puede "
+                        "retirarla."
+                    )
+                if not puede_retirar(estado_anterior):
+                    raise TransicionInvalida(estado_anterior, ESTADO_FINALIZADA)
+
+                cursor.execute(
+                    """
+                    UPDATE solicitud
+                    SET estado_workflow = %s,
+                        resolucion = %s,
+                        motivo_resolucion = %s,
+                        fecha_resolucion = NOW(),
+                        id_resuelve = %s
+                    WHERE id_solicitud = %s AND estado_workflow = %s
+                    """,
+                    (
+                        ESTADO_FINALIZADA,
+                        RESOLUCION_RETIRADA,
+                        cifrar(texto),
+                        id_usuario,
+                        id_solicitud,
+                        estado_anterior,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise TransicionInvalida(estado_anterior, ESTADO_FINALIZADA)
+
+                _registrar_historial(
+                    cursor,
+                    id_solicitud,
+                    estado_anterior,
+                    ESTADO_FINALIZADA,
+                    id_usuario,
+                    "Solicitud retirada por el consultor.",
+                )
+                if estado_anterior == ESTADO_PENDIENTE_FIRMA_COORDINADOR:
+                    marcar_atendidos(cursor, id_solicitud)
+                marcar_actividad(cursor, id_usuario)
+
+        logger.info(
+            "Solicitud %s retirada desde '%s' por usuario %s",
+            id_solicitud,
+            estado_anterior,
+            id_usuario,
+        )
+        if estado_anterior == ESTADO_PENDIENTE_FIRMA_COORDINADOR:
+            avisar_en_segundo_plano(avisos_flujo.RETIRADA, id_solicitud)
         return estado_anterior
     finally:
         conn.close()
