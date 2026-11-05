@@ -224,7 +224,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | C-05 | Validar transición permitida | ✅ | `cambiar_estado` bloquea con `FOR UPDATE` + grafo de transiciones | — |
 | C-06 | Ver el PDF antes de firmar | 🔴 | No hay vista previa del expediente |
 | C-07 | Asignación por equipo/coordinador | ✅ | Fase 11: `solicitud.id_coordinador`; la bandeja muestra solo sus expedientes y solo él puede firmarlos |
-| C-08 | Rechazo / devolución con motivo | 🔴 | No definido en la tesis; decidir D-06 |
+| C-08 | Rechazo / devolución con motivo | ✅ | Fase 16: el Coordinador GTC o Gerencia deniegan con motivo y firma (D-06 revisada) |
 | C-09 | Evidencia de auditoría | ✅ | `solicitud_historial` registra actor, fecha y observación | — |
 | C-10 | Bandeja de recordatorios | ✅ | **R-11**: aviso y tabla de recordatorios pendientes; se marcan atendidos al firmar | — |
 
@@ -399,7 +399,7 @@ RBAC positivo ya está cubierto por AppTest).
 | **D-03** | Origen del saldo de vacaciones | (A) campo `dias_vacaciones_asignados` en `usuario` · (B) cálculo por año a partir de solicitudes · (C) ambos | **C confirmada**: asignado − usado = disponible (Fase 5) |
 | **D-04** | Feriados | (A) tabla `feriado` administrable · (B) lista fija en código | **A confirmada**: tabla `feriado` con panel de Gerencia (Fase 5) |
 | **D-05** | Cifrado de datos sensibles | (A) Fernet en la app · (B) `pgcrypto` en PostgreSQL | **A confirmada** (clave en `.env`/`st.secrets`, sin exponerla a la BD) |
-| **D-06** | Rechazo/devolución | (A) agregar estado `Devuelta` con motivo · (B) fuera de alcance | **B** para no ampliar el alcance de la tesis; documentarlo como límite |
+| **D-06** | Rechazo/devolución | (A) agregar estado `Devuelta` con motivo · (B) fuera de alcance | **Revisada el 04/11/2026:** se mantienen los 4 estados; *Finalizada* lleva resolución Aprobada/Denegada (Fase 16) |
 
 > **Nota:** la tesis es internamente ambigua en D-01: HU-01/QA-03 dicen
 > `Ingresada`, mientras 4.12.3 paso 3 dice `Pendiente de Firma Coordinador`.
@@ -653,6 +653,22 @@ objetivo c) y los coordinadores del banco quedan fuera de la baja automática.
 **Criterio de aceptación:** un consultor con el plazo por vencer recibe un
 correo por etapa sin entrar al sistema. ✅ **Cumplido** (pendiente de cargar
 los secretos de la cuenta de SETESA en GitHub).
+
+---
+
+### Fase 16 — Aprobar o denegar · cierra D-06 / C-08
+
+- [x] **Resolución** al finalizar: *Aprobada* o *Denegada* (`solicitud.resolucion`); se mantienen los 4 estados de la tesis.
+- [x] **Coordinador GTC** puede denegar (el banco no otorga el permiso) y cierra el flujo; **Gerencia** aprueba o deniega.
+- [x] La denegación exige **motivo** (cifrado) y la **firma** de quien deniega; el motivo no se copia al historial.
+- [x] **Saldo de vacaciones**: las solicitudes denegadas no descuentan días (se devuelven).
+- [x] **PDF**: recuadro «RESOLUCIÓN: APROBADA / DENEGADA POR …» con el motivo; la firma de Gerencia figura como «(No aplica)» si deniega el banco.
+- [x] **Dashboard** con columna de resolución y conteo de aprobadas y denegadas; el consultor ve resolución y motivo en su historial.
+- [x] **Triggers**: denegación solo desde las etapas permitidas, por el actor asignado, con motivo y firma; la resolución solo se registra al finalizar.
+- [x] Migración `scripts/migracion_fase16.py` (`--simular`) y pruebas `tests/test_denegacion.py` (10) y `tests/test_triggers.py` (27).
+
+**Criterio de aceptación:** una solicitud denegada por el banco o por Gerencia
+queda finalizada con su motivo y devuelve los días al saldo. ✅ **Cumplido.**
 
 ---
 
