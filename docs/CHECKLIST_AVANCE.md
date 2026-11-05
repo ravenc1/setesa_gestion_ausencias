@@ -703,6 +703,23 @@ y al finalizar un expediente Contabilidad y RR.HH. recibe el aviso. ✅ **Cumpli
 
 ---
 
+### Fase 19 — PDF fiel a la plantilla Excel oficial
+
+- [x] **Geometría de la plantilla** (`Accion Personal - Solicitud de Ausencias - SETESA.xlsx`): anchos de columna A–I, alto de filas, bordes, fuentes Arial 9/20 y escala de impresión del 95 %.
+- [x] **Logo de SETESA** en C1 (aplanado sobre blanco) y título «ACCION DE PERSONAL» en C7:I8.
+- [x] **Campos** DE, PARA, CODIGO, PUESTO y FECHA en sus posiciones, con línea y valor.
+- [x] **Cuadrícula** de 3 bloques con casillas, en el orden de la hoja; la opción elegida se marca con «X».
+- [x] **Fechas** dd/mm/aaaa («Del … al …», FECHA) y «Cantidad de dias».
+- [x] **Recuadro de explicación** de 8 filas con la NOTA de RR.HH.; el texto se ajusta (9 → 7 pt) y la app limita la explicación a 1200 caracteres.
+- [x] **Firmas** sobre las líneas de JEFE INMEDIATO GTC, EMPLEADO QUE SE LE APLICA y SETESA, con el nombre debajo.
+- [x] Diferencias deliberadas: filas 49–50 más altas para las firmas digitales; resolución y pie con el número de expediente debajo de las firmas.
+- [x] Pruebas `tests/test_motor_pdf.py` (10); conteos de imágenes actualizados (logo + firmas).
+
+**Criterio de aceptación:** el PDF generado reproduce la hoja oficial con los
+datos de la solicitud. ✅ **Cumplido.**
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:

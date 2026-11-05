@@ -142,8 +142,8 @@ def test_pdf_final_con_tres_firmas_es_inmutable(ids, repositorio):
         assert datos["pdf_inmutable"] is True
 
         contenido = almacenamiento.leer(clave)
-        assert contenido.count(b"/Subtype /Image") == 3, (
-            "El PDF final debe estampar las tres firmas"
+        assert contenido.count(b"/Subtype /Image") == 4, (
+            "El PDF final debe llevar el logo y las tres firmas"
         )
         assert despues - antes == set(), "No deben quedar imágenes temporales"
         assert not list(PDF_DIR.glob(f"accion_{id_solicitud}_*.pdf")), (
@@ -166,7 +166,8 @@ def test_borrador_solo_estampa_consultor_y_se_regenera(ids):
     try:
         clave = generar_pdf_solicitud(id_solicitud)
         assert clave == f"pdf/{id_solicitud}/borrador.pdf"
-        assert almacenamiento.leer(clave).count(b"/Subtype /Image") == 1
+        # Logo de SETESA + firma del consultor.
+        assert almacenamiento.leer(clave).count(b"/Subtype /Image") == 2
         assert obtener_solicitud(id_solicitud)["pdf_inmutable"] is False
 
         # Regenerar el borrador reutiliza la clave (no acumula PDFs).

@@ -3,7 +3,9 @@
 # Contabilidad comparte el repositorio de expedientes con Gerencia, pero en modo
 # consulta: no autoriza, no firma y no administra vigencia ni feriados.
 
+import datetime
 import os
+from contextlib import contextmanager
 from uuid import uuid4
 
 import pytest
@@ -11,6 +13,7 @@ from streamlit.testing.v1 import AppTest
 
 from src.core.database import get_connection
 from src.core.security import hash_password
+from src.core.solicitudes import registrar_solicitud
 
 RUTA_APP = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app.py")
 
@@ -77,6 +80,63 @@ def _eliminar_usuario(correo):
         conn.close()
 
 
+@contextmanager
+def _solicitud_de_prueba():
+    """Crea una solicitud temporal para que el panel tenga expedientes.
+
+    El panel no muestra el repositorio ni las acciones si la base está vacía.
+    """
+    conn = get_connection()
+    if not conn:
+        pytest.skip("No hay conexión a la base de datos.")
+    marca = uuid4().hex[:8]
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT u.id_usuario FROM usuario u
+                    JOIN rol r ON u.id_rol = r.id_rol
+                    WHERE r.nombre_rol = 'Consultor' AND u.estado_vigencia = TRUE
+                    ORDER BY u.id_usuario LIMIT 1
+                    """
+                )
+                consultor = cursor.fetchone()
+                cursor.execute(
+                    """
+                    SELECT u.id_usuario FROM usuario u
+                    JOIN rol r ON u.id_rol = r.id_rol
+                    WHERE r.nombre_rol = 'Coordinador GTC' AND u.estado_vigencia = TRUE
+                    ORDER BY u.id_usuario LIMIT 1
+                    """
+                )
+                coordinador = cursor.fetchone()
+    finally:
+        conn.close()
+    if not consultor or not coordinador:
+        pytest.skip("Faltan un Consultor y un Coordinador GTC vigentes.")
+
+    id_solicitud = registrar_solicitud(
+        consultor[0], "DUELO", datetime.date(2035, 3, 5),
+        datetime.date(2035, 3, 6), coordinador[0], "Consultor", "C-001", 2,
+        f"PYTEST_RBAC_{marca}", None,
+    )
+    try:
+        yield id_solicitud
+    finally:
+        conn = get_connection()
+        try:
+            with conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SET LOCAL setesa.permitir_borrado = 'on'")
+                    cursor.execute(
+                        "DELETE FROM solicitud WHERE id_solicitud = %s",
+                        (id_solicitud,),
+                    )
+        finally:
+            conn.close()
+
+
 def _sesion(rol, id_usuario=None, nombre="PYTEST"):
     at = AppTest.from_file(RUTA_APP, default_timeout=60)
     at.session_state["logged_in"] = True
@@ -90,11 +150,12 @@ def _sesion(rol, id_usuario=None, nombre="PYTEST"):
 def test_panel_contabilidad_sin_excepciones_y_en_solo_lectura():
     id_usuario, correo = _crear_usuario_contabilidad()
     try:
-        at = _sesion("Contabilidad", id_usuario, "PYTEST CONTABILIDAD")
+        with _solicitud_de_prueba():
+            at = _sesion("Contabilidad", id_usuario, "PYTEST CONTABILIDAD")
 
         assert not at.exception, [e.value for e in at.exception]
         assert any(
-            "Panel de Contabilidad" in m.value for m in at.markdown
+            "Contabilidad y RR.HH." in m.value for m in at.markdown
         ), "No se renderizó el panel de Contabilidad."
         assert any(
             "Descarga del expediente final" in m.value for m in at.markdown
@@ -149,8 +210,10 @@ def test_gerencia_conserva_pestanas_y_autorizacion():
     if not fila:
         pytest.skip("No hay usuario activo con rol Administrador.")
 
-    at = _sesion("Administrador", fila[0], fila[1])
+    with _solicitud_de_prueba():
+        at = _sesion("Administrador", fila[0], fila[1])
     assert not at.exception, [e.value for e in at.exception]
     assert any("Panel de Control Gerencial" in m.value for m in at.markdown)
-    assert len(at.tabs) == 3
+    # Dashboard, Reasignar Coordinador (Fase 12), Vigencia y Feriados.
+    assert len(at.tabs) == 4
     assert any("Gestión de Workflow" in m.value for m in at.markdown)

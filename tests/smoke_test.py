@@ -292,7 +292,8 @@ def test_pdf():
         check("PDF en storage/pdf", ubicado)
         contenido = Path(ruta).read_bytes()
         imagenes = contenido.count(b"/Subtype /Image")
-        check("PDF con las 3 firmas estampadas", imagenes == 3,
+        # Fase 19: logo de SETESA + 3 firmas.
+        check("PDF con logo y las 3 firmas estampadas", imagenes == 4,
               f"-> {imagenes} imágenes")
     except Exception as e:
         check("generación de PDF", False, f"-> {e}")
@@ -470,7 +471,7 @@ def test_dashboard_gerencia():
         ruta_pdf = obtener_solicitud(id_solicitud)["ruta_pdf"]
         check("dashboard: PDF final descargable con 3 firmas",
               contenido.startswith(b"%PDF")
-              and contenido.count(b"/Subtype /Image") == 3,
+              and contenido.count(b"/Subtype /Image") == 4,
               f"-> {nombre_pdf}")
     except Exception as e:
         check("dashboard: repositorio y descarga", False, f"-> {e}")
