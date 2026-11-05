@@ -17,8 +17,11 @@ from src.core.reportes import (
 from src.core.security import ROLES_PANEL, es_solo_lectura, rol_autorizado
 from src.core.solicitudes import (
     FirmaRequerida,
+    MotivoRequerido,
+    NoAutorizadoParaDenegar,
     TransicionInvalida,
     cambiar_estado,
+    denegar_solicitud,
     obtener_historial,
 )
 from src.core.workflow import (
@@ -45,8 +48,8 @@ def obtener_solicitudes():
     query = """
         SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
                s.fecha_inicio, s.fecha_fin, s.dias_solicitados,
-               s.estado_workflow, s.fecha_creacion, s.ruta_pdf,
-               s.pdf_hash
+               s.estado_workflow, s.resolucion, s.fecha_creacion,
+               s.ruta_pdf, s.pdf_hash
         FROM solicitud s
         JOIN usuario u ON s.id_usuario = u.id_usuario
         ORDER BY s.fecha_creacion DESC
@@ -89,7 +92,15 @@ def _mostrar_kpis(kpis):
     col2.metric("Ingresadas", kpis["ingresadas"])
     col3.metric("Pendientes Coordinador", kpis["pendientes_coordinador"])
     col4.metric("Pendientes Gerencia", kpis["pendientes_gerencia"])
-    col5.metric("Finalizadas", kpis["finalizadas"])
+    col5.metric(
+        "Finalizadas",
+        kpis["finalizadas"],
+        help=f"Aprobadas: {kpis['aprobadas']} · Denegadas: {kpis['denegadas']}",
+    )
+    st.caption(
+        f"Resoluciones: ✅ {kpis['aprobadas']} aprobada(s) · "
+        f"⛔ {kpis['denegadas']} denegada(s)."
+    )
 
 
 def _mostrar_tabla(df_filtrado):
@@ -359,9 +370,26 @@ def mostrar_dashboard():
             key=f"canvas_gerencia_{id_seleccionado}",
             return_image_data=True,
         )
-        observacion = st.text_input("Observación de Gerencia (opcional)")
+        # Fase 16: Gerencia aprueba o deniega; ambas decisiones cierran el flujo.
+        decision = st.radio(
+            "Decisión de Gerencia",
+            ["Aprobar", "Denegar"],
+            horizontal=True,
+            key=f"decision_gerencia_{id_seleccionado}",
+        )
+        denegar = decision == "Denegar"
+        if denegar:
+            observacion = st.text_area(
+                "Motivo de la denegación (obligatorio; lo verá el consultor)",
+                key=f"motivo_gerencia_{id_seleccionado}",
+            )
+        else:
+            observacion = st.text_input("Observación de Gerencia (opcional)")
         btn_actualizar = st.button(
-            "✅ Aprobar, Firmar y Finalizar Expediente", type="primary"
+            "⛔ Denegar, Firmar y Finalizar Expediente"
+            if denegar
+            else "✅ Aprobar, Firmar y Finalizar Expediente",
+            type="primary",
         )
 
         if btn_actualizar and id_seleccionado:
@@ -373,16 +401,26 @@ def mostrar_dashboard():
                 st.error("❌ Debe dibujar su firma antes de finalizar el expediente.")
             else:
                 try:
-                    cambiar_estado(
-                        id_seleccionado,
-                        ESTADO_FINALIZADA,
-                        st.session_state["id_usuario"],
-                        observacion or "Aprobación final de Gerencia.",
-                        firma_b64=firma_base64,
-                    )
+                    if denegar:
+                        denegar_solicitud(
+                            id_seleccionado,
+                            st.session_state["id_usuario"],
+                            observacion,
+                            firma_base64,
+                        )
+                    else:
+                        cambiar_estado(
+                            id_seleccionado,
+                            ESTADO_FINALIZADA,
+                            st.session_state["id_usuario"],
+                            observacion or "Aprobación final de Gerencia.",
+                            firma_b64=firma_base64,
+                        )
+                except MotivoRequerido as e:
+                    st.error(f"❌ {e}")
                 except FirmaRequerida as e:
                     st.error(f"Debe firmar el expediente: {e}")
-                except TransicionInvalida as e:
+                except (TransicionInvalida, NoAutorizadoParaDenegar) as e:
                     st.error(f"No se puede finalizar: {e}")
                 except Exception as e:
                     st.error(f"Error al actualizar el estado: {e}")
@@ -391,7 +429,8 @@ def mostrar_dashboard():
                         ruta = generar_pdf_solicitud(id_seleccionado)
                         st.session_state["flash_gerencia"] = (
                             "success",
-                            f"El expediente #{id_seleccionado} fue finalizado y "
+                            f"El expediente #{id_seleccionado} fue "
+                            f"{'denegado' if denegar else 'aprobado'} y "
                             f"firmado. PDF actualizado en {ruta}.",
                         )
                     except Exception as e:

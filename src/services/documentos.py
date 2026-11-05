@@ -67,6 +67,13 @@ def generar_pdf_solicitud(id_solicitud):
         firma_jefe_b64=datos["firma_jefe_gtc"],
         firma_gerencia_b64=datos["firma_gerencia"],
         id_solicitud=id_solicitud,
+        resolucion=datos.get("resolucion"),
+        motivo_resolucion=datos.get("motivo_resolucion"),
+        denegada_por=(
+            "Gerencia" if datos.get("firma_gerencia") else "Coordinador GTC"
+        )
+        if datos.get("resolucion") == "Denegada"
+        else None,
     )
 
     sello = calcular_sha256(ruta)

@@ -71,6 +71,17 @@ CREATE TABLE IF NOT EXISTS solicitud (
     firma_gerencia   TEXT,
     pdf_hash         VARCHAR(64),
     pdf_hash_fecha   TIMESTAMP,
+    -- Fase 16: resolución del expediente al finalizar (motivo cifrado).
+    resolucion        VARCHAR(10),
+    motivo_resolucion TEXT,
+    fecha_resolucion  TIMESTAMP,
+    id_resuelve       INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    CONSTRAINT solicitud_resolucion_check CHECK (
+        resolucion IN ('Aprobada', 'Denegada')
+    ),
+    CONSTRAINT solicitud_finalizada_resolucion_check CHECK (
+        (estado_workflow = 'Finalizada') = (resolucion IS NOT NULL)
+    ),
     CONSTRAINT solicitud_estado_workflow_check CHECK (
         estado_workflow IN (
             'Ingresada',

@@ -53,7 +53,8 @@ def obtener_mis_solicitudes(id_usuario):
     # Se agregaron las columnas de firma al SELECT para poder inyectarlas en el PDF histórico.
     query = """
         SELECT id_solicitud, fecha_creacion, tipo_ausencia, fecha_inicio, fecha_fin,
-               dias_solicitados, estado_workflow, jefe_gtc, puesto, codigo_empleado,
+               dias_solicitados, estado_workflow, resolucion, motivo_resolucion,
+               jefe_gtc, puesto, codigo_empleado,
                explicacion, firma_empleado, firma_jefe_gtc, firma_gerencia
         FROM solicitud
         WHERE id_usuario = %s ORDER BY fecha_creacion DESC

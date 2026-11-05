@@ -21,6 +21,7 @@ CAMPOS_SENSIBLES = (
     "firma_jefe_gtc",
     "firma_gerencia",
     "telefono",
+    "motivo_resolucion",
 )
 
 

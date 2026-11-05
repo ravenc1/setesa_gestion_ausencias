@@ -33,6 +33,16 @@ def cur():
             "ALTER TABLE usuario ADD COLUMN IF NOT EXISTS "
             "fecha_actualizacion_datos TIMESTAMP DEFAULT NOW()"
         )
+        # Columnas de la Fase 16.
+        for columna in (
+            "resolucion VARCHAR(10)",
+            "motivo_resolucion TEXT",
+            "fecha_resolucion TIMESTAMP",
+            "id_resuelve INTEGER",
+        ):
+            cursor.execute(
+                f"ALTER TABLE solicitud ADD COLUMN IF NOT EXISTS {columna}"
+            )
         cursor.execute(SQL_TRIGGERS)
         yield cursor
     finally:
@@ -123,8 +133,8 @@ def _finalizar(cur, a, id_sol):
     )
     _historial(cur, id_sol, PEND_COORD, PEND_GER, a["coord"])
     cur.execute(
-        "UPDATE solicitud SET estado_workflow = %s, firma_gerencia = 'f' "
-        "WHERE id_solicitud = %s",
+        "UPDATE solicitud SET estado_workflow = %s, firma_gerencia = 'f', "
+        "resolucion = 'Aprobada' WHERE id_solicitud = %s",
         (FINALIZADA, id_sol),
     )
     _historial(cur, id_sol, PEND_GER, FINALIZADA, a["gerencia"])
@@ -346,4 +356,89 @@ def test_it_puede_reasignar(cur, actores):
         "INSERT INTO solicitud_historial (id_solicitud, estado_anterior, "
         "estado_nuevo, id_usuario) VALUES (%s, %s, %s, %s)",
         (id_sol, PEND_COORD, PEND_COORD, actores["consultor"]),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fase 16: resolución Aprobada / Denegada
+# ---------------------------------------------------------------------------
+DENEGAR_BANCO = (
+    "UPDATE solicitud SET estado_workflow = 'Finalizada', firma_jefe_gtc = 'f', "
+    "resolucion = 'Denegada', motivo_resolucion = %s WHERE id_solicitud = %s"
+)
+
+
+def test_banco_puede_denegar_con_motivo_y_firma(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    assert not _rechaza(cur, DENEGAR_BANCO, ("cifrado", id_sol))
+    assert not _rechaza(
+        cur,
+        "INSERT INTO solicitud_historial (id_solicitud, estado_anterior, "
+        "estado_nuevo, id_usuario) VALUES (%s, %s, %s, %s)",
+        (id_sol, PEND_COORD, FINALIZADA, actores["coord"]),
+    )
+
+
+def test_denegacion_exige_motivo(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    assert _rechaza(cur, DENEGAR_BANCO, (None, id_sol))
+
+
+def test_banco_no_puede_aprobar_y_finalizar(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    assert _rechaza(
+        cur,
+        "UPDATE solicitud SET estado_workflow = 'Finalizada', firma_jefe_gtc = 'f', "
+        "firma_gerencia = 'f', resolucion = 'Aprobada' WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+
+
+def test_solo_el_coordinador_asignado_deniega(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    cur.execute(DENEGAR_BANCO, ("cifrado", id_sol))
+    assert _rechaza(
+        cur,
+        "INSERT INTO solicitud_historial (id_solicitud, estado_anterior, "
+        "estado_nuevo, id_usuario) VALUES (%s, %s, %s, %s)",
+        (id_sol, PEND_COORD, FINALIZADA, actores["coord_otro"]),
+    )
+
+
+def test_finalizar_exige_resolucion(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    cur.execute(
+        "UPDATE solicitud SET estado_workflow = %s, firma_jefe_gtc = 'f' "
+        "WHERE id_solicitud = %s",
+        (PEND_GER, id_sol),
+    )
+    assert _rechaza(
+        cur,
+        "UPDATE solicitud SET estado_workflow = 'Finalizada', firma_gerencia = 'f' "
+        "WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+
+
+def test_gerencia_puede_denegar(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    cur.execute(
+        "UPDATE solicitud SET estado_workflow = %s, firma_jefe_gtc = 'f' "
+        "WHERE id_solicitud = %s",
+        (PEND_GER, id_sol),
+    )
+    assert not _rechaza(
+        cur,
+        "UPDATE solicitud SET estado_workflow = 'Finalizada', firma_gerencia = 'f', "
+        "resolucion = 'Denegada', motivo_resolucion = 'm' WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+
+
+def test_resolucion_solo_al_finalizar(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    assert _rechaza(
+        cur,
+        "UPDATE solicitud SET resolucion = 'Denegada' WHERE id_solicitud = %s",
+        (id_sol,),
     )

@@ -20,6 +20,9 @@ from src.core.validaciones import (
 )
 from src.core.vigencia import marcar_actividad
 from src.core.workflow import (
+    ETAPAS_DENEGACION,
+    RESOLUCION_APROBADA,
+    RESOLUCION_DENEGADA,
     ESTADO_FINALIZADA,
     ESTADO_INGRESADA,
     ESTADO_PENDIENTE_APROBACION_GERENCIA,
@@ -54,6 +57,14 @@ class CoordinadorNoAsignado(Exception):
             f"El expediente {id_solicitud} está asignado a otro Coordinador GTC; "
             "solo el coordinador asignado puede darle su visto bueno."
         )
+
+
+class MotivoRequerido(Exception):
+    """La denegación exige un motivo."""
+
+
+class NoAutorizadoParaDenegar(Exception):
+    """El usuario no puede denegar el expediente en su etapa actual."""
 
 
 class FirmaRequerida(Exception):
@@ -290,13 +301,28 @@ def cambiar_estado(
 
                 if columna_firma:
                     firma_cifrada = cifrar(firma_b64)
+                    # Fase 16: la aprobación de Gerencia deja la resolución.
+                    finaliza = estado_nuevo == ESTADO_FINALIZADA
+                    resolucion = (
+                        ", resolucion = %s, fecha_resolucion = NOW(), "
+                        "id_resuelve = %s"
+                        if finaliza
+                        else ""
+                    )
+                    extra = (RESOLUCION_APROBADA, id_usuario) if finaliza else ()
                     cursor.execute(
                         f"""
                         UPDATE solicitud
-                        SET estado_workflow = %s, {columna_firma} = %s
+                        SET estado_workflow = %s, {columna_firma} = %s{resolucion}
                         WHERE id_solicitud = %s AND estado_workflow = %s
                         """,
-                        (estado_nuevo, firma_cifrada, id_solicitud, estado_anterior),
+                        (
+                            estado_nuevo,
+                            firma_cifrada,
+                            *extra,
+                            id_solicitud,
+                            estado_anterior,
+                        ),
                     )
                 else:
                     cursor.execute(
@@ -335,6 +361,125 @@ def cambiar_estado(
             id_usuario,
         )
         return estado_anterior, estado_nuevo
+    finally:
+        conn.close()
+
+
+# Columna de la firma de quien deniega, según la etapa.
+_FIRMA_DENEGACION = {
+    ESTADO_PENDIENTE_FIRMA_COORDINADOR: "firma_jefe_gtc",
+    ESTADO_PENDIENTE_APROBACION_GERENCIA: "firma_gerencia",
+}
+
+_TEXTO_DENEGACION = {
+    ESTADO_PENDIENTE_FIRMA_COORDINADOR: "Solicitud denegada por el Coordinador GTC.",
+    ESTADO_PENDIENTE_APROBACION_GERENCIA: "Solicitud denegada por Gerencia.",
+}
+
+MOTIVO_MIN = 10
+
+
+def denegar_solicitud(id_solicitud, id_usuario, motivo, firma_b64):
+    """Deniega el expediente y cierra el flujo (Fase 16).
+
+    - En 'Pendiente de Firma Coordinador' deniega el Coordinador GTC asignado
+      (el banco no otorga el permiso).
+    - En 'Pendiente de Aprobación Gerencia' deniega Gerencia.
+
+    El motivo es obligatorio y se guarda cifrado; la firma de quien deniega
+    queda en el expediente. Los días de vacaciones vuelven al saldo porque el
+    saldo no cuenta solicitudes denegadas. Devuelve el estado anterior.
+    """
+    texto = (motivo or "").strip()
+    if len(texto) < MOTIVO_MIN:
+        raise MotivoRequerido(
+            f"Indique el motivo de la denegación (mínimo {MOTIVO_MIN} caracteres)."
+        )
+    if not _firma_valida(firma_b64):
+        raise FirmaRequerida(ESTADO_FINALIZADA)
+
+    conn = get_connection()
+    if not conn:
+        raise RuntimeError("No hay conexión a la base de datos.")
+
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT s.estado_workflow, s.id_coordinador, r.nombre_rol
+                    FROM solicitud s
+                    JOIN usuario u ON u.id_usuario = %s
+                    JOIN rol r ON r.id_rol = u.id_rol
+                    WHERE s.id_solicitud = %s
+                    FOR UPDATE OF s
+                    """,
+                    (id_usuario, id_solicitud),
+                )
+                fila = cursor.fetchone()
+                if not fila:
+                    raise SolicitudNoEncontrada(
+                        f"No existe la solicitud con id {id_solicitud}."
+                    )
+                estado_anterior, id_coordinador, rol = fila
+
+                if estado_anterior not in ETAPAS_DENEGACION:
+                    raise TransicionInvalida(estado_anterior, ESTADO_FINALIZADA)
+                if estado_anterior == ESTADO_PENDIENTE_FIRMA_COORDINADOR:
+                    if id_coordinador != id_usuario:
+                        raise CoordinadorNoAsignado(id_solicitud)
+                elif rol != ETAPAS_DENEGACION[estado_anterior]:
+                    raise NoAutorizadoParaDenegar(
+                        "Solo Gerencia puede denegar un expediente que espera "
+                        "su aprobación."
+                    )
+
+                columna_firma = _FIRMA_DENEGACION[estado_anterior]
+                cursor.execute(
+                    f"""
+                    UPDATE solicitud
+                    SET estado_workflow = %s,
+                        {columna_firma} = %s,
+                        resolucion = %s,
+                        motivo_resolucion = %s,
+                        fecha_resolucion = NOW(),
+                        id_resuelve = %s
+                    WHERE id_solicitud = %s AND estado_workflow = %s
+                    """,
+                    (
+                        ESTADO_FINALIZADA,
+                        cifrar(firma_b64),
+                        RESOLUCION_DENEGADA,
+                        cifrar(texto),
+                        id_usuario,
+                        id_solicitud,
+                        estado_anterior,
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise TransicionInvalida(estado_anterior, ESTADO_FINALIZADA)
+
+                # El motivo no va al historial: puede ser sensible y allí no
+                # se cifra. Queda cifrado en solicitud.motivo_resolucion.
+                _registrar_historial(
+                    cursor,
+                    id_solicitud,
+                    estado_anterior,
+                    ESTADO_FINALIZADA,
+                    id_usuario,
+                    _TEXTO_DENEGACION[estado_anterior],
+                )
+                if estado_anterior == ESTADO_PENDIENTE_FIRMA_COORDINADOR:
+                    marcar_atendidos(cursor, id_solicitud)
+                marcar_actividad(cursor, id_usuario)
+
+        logger.info(
+            "Solicitud %s denegada desde '%s' por usuario %s",
+            id_solicitud,
+            estado_anterior,
+            id_usuario,
+        )
+        return estado_anterior
     finally:
         conn.close()
 
