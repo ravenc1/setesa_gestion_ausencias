@@ -83,13 +83,35 @@ def consultor():
         conn.close()
 
 
+def _id_coordinador():
+    """Primer Coordinador GTC vigente, jefe inmediato de las pruebas."""
+    conn = _conectar()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT u.id_usuario FROM usuario u
+                JOIN rol r ON u.id_rol = r.id_rol
+                WHERE r.nombre_rol = 'Coordinador GTC'
+                  AND u.estado_vigencia = TRUE
+                ORDER BY u.id_usuario LIMIT 1
+                """
+            )
+            fila = cursor.fetchone()
+    finally:
+        conn.close()
+    if not fila:
+        pytest.skip("No hay un Coordinador GTC vigente.")
+    return fila[0]
+
+
 def _registrar(id_usuario, tipo, inicio, fin, dias):
     return registrar_solicitud(
         id_usuario,
         tipo,
         inicio,
         fin,
-        "Coordinador GTC",
+        _id_coordinador(),
         "Consultor",
         "C-001",
         dias,

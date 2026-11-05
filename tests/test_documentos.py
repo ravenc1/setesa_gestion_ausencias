@@ -73,13 +73,13 @@ def ids():
     return _ids_por_rol()
 
 
-def _crear_solicitud(id_usuario):
+def _crear_solicitud(id_usuario, id_coordinador):
     return registrar_solicitud(
         id_usuario,
         "VACACION",
         datetime.date(2026, 10, 12),
         datetime.date(2026, 10, 16),
-        "Jefe GTC",
+        id_coordinador,
         "Consultor",
         "C-001",
         5,
@@ -110,7 +110,7 @@ def _limpiar(id_solicitud, ruta_pdf=None):
 
 
 def test_pdf_final_con_tres_firmas_y_ruta_persistida(ids):
-    id_solicitud = _crear_solicitud(ids["Consultor"])
+    id_solicitud = _crear_solicitud(ids["Consultor"], ids["Coordinador GTC"])
     ruta = None
     try:
         cambiar_estado(
@@ -149,7 +149,7 @@ def test_pdf_final_con_tres_firmas_y_ruta_persistida(ids):
 
 
 def test_pdf_sin_aprobaciones_solo_estampa_consultor(ids):
-    id_solicitud = _crear_solicitud(ids["Consultor"])
+    id_solicitud = _crear_solicitud(ids["Consultor"], ids["Coordinador GTC"])
     ruta = None
     try:
         ruta = generar_pdf_solicitud(id_solicitud)
@@ -163,7 +163,7 @@ def test_pdf_sin_aprobaciones_solo_estampa_consultor(ids):
 
 
 def test_pdf_se_sella_y_detecta_alteracion(ids):
-    id_solicitud = _crear_solicitud(ids["Consultor"])
+    id_solicitud = _crear_solicitud(ids["Consultor"], ids["Coordinador GTC"])
     ruta = None
     try:
         ruta = generar_pdf_solicitud(id_solicitud)
@@ -189,7 +189,7 @@ def test_pdf_se_sella_y_detecta_alteracion(ids):
 
 
 def test_datos_sensibles_se_guardan_cifrados(ids):
-    id_solicitud = _crear_solicitud(ids["Consultor"])
+    id_solicitud = _crear_solicitud(ids["Consultor"], ids["Coordinador GTC"])
     try:
         conn = get_connection()
         if not conn:

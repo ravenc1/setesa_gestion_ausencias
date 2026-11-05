@@ -103,7 +103,7 @@ def test_repositorio_filtros_y_descarga_pdf_final():
         "VACACION",
         fecha_inicio,
         fecha_fin,
-        "Jefe GTC",
+        ids["Coordinador GTC"],
         "Consultor",
         "C-001",
         5,

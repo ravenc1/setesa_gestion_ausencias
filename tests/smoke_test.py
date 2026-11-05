@@ -73,6 +73,14 @@ def check(nombre, condicion, detalle=""):
     print(f"[{estado}] {nombre} {detalle}")
 
 
+def _primer_coordinador():
+    """Id del primer Coordinador GTC vigente (jefe inmediato de las pruebas)."""
+    coordinadores = listar_coordinadores()
+    if coordinadores.empty:
+        raise RuntimeError("No hay un Coordinador GTC vigente para las pruebas.")
+    return int(coordinadores["id_usuario"].iloc[0])
+
+
 def firma_dummy_b64():
     img = Image.new("RGB", (120, 40), (255, 255, 255))
     buf = io.BytesIO()
@@ -166,7 +174,7 @@ def test_workflow_end_to_end(conn):
         id_solicitud = registrar_solicitud(
             id_consultor, "VACACION",
             datetime.date(2026, 10, 12), datetime.date(2026, 10, 16),
-            "Jefe GTC", "Consultor", "C-001", 5, marca, firma_dummy_b64(),
+            id_coordinador, "Consultor", "C-001", 5, marca, firma_dummy_b64(),
         )
         check("1) Registro transaccional", id_solicitud is not None,
               f"-> id={id_solicitud}")
@@ -314,7 +322,7 @@ def test_consultor_flujo():
 
         id_solicitud = registrar_solicitud_firmada(
             id_usuario, "VACACION", datetime.date(2026, 10, 12),
-            datetime.date(2026, 10, 16), "Jefe GTC", "Consultor", "C-001",
+            datetime.date(2026, 10, 16), _primer_coordinador(), "Consultor", "C-001",
             5, marca, firma_dummy_b64(),
         )
         check("consultor: registrar_solicitud_firmada", id_solicitud is not None)
@@ -415,7 +423,7 @@ def test_dashboard_gerencia():
         id_solicitud = registrar_solicitud(
             id_consultor, "VACACION",
             datetime.date(2030, 1, 7), datetime.date(2030, 1, 11),
-            "Jefe GTC", "Consultor", "C-001", 5, marca, firma_dummy_b64(),
+            id_coordinador, "Consultor", "C-001", 5, marca, firma_dummy_b64(),
         )
         cambiar_estado(
             id_solicitud, ESTADO_PENDIENTE_APROBACION_GERENCIA,
@@ -533,7 +541,7 @@ def test_vacaciones_feriados():
             "VACACION",
             datetime.date(2031, 1, 6),
             datetime.date(2031, 1, 7),
-            "Jefe GTC",
+            _primer_coordinador(),
             "Consultor",
             "C-001",
             2,
@@ -553,7 +561,7 @@ def test_vacaciones_feriados():
                 "VACACION",
                 datetime.date(2031, 2, 3),
                 datetime.date(2031, 2, 28),
-                "Jefe GTC",
+                _primer_coordinador(),
                 "Consultor",
                 "C-001",
                 20,
@@ -571,7 +579,7 @@ def test_vacaciones_feriados():
                 "DUELO",
                 datetime.date(2031, 3, 10),
                 datetime.date(2031, 3, 9),
-                "Jefe GTC",
+                _primer_coordinador(),
                 "Consultor",
                 "C-001",
                 1,

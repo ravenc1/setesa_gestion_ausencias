@@ -112,7 +112,7 @@ def solicitud():
         "DUELO",
         datetime.date(2032, 1, 5),
         datetime.date(2032, 1, 6),
-        datos["coordinador_nombre"],
+        datos["coordinador"],
         "Consultor",
         "C-001",
         2,
