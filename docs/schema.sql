@@ -246,6 +246,26 @@ ON CONFLICT (fecha) DO NOTHING;
 COMMIT;
 
 -- ---------------------------------------------------------------------------
+-- Fase 15: recordatorios por correo para actualizar "Mis datos"
+--   Un registro por correo (etapas de 30, 15, 7 y 1 día antes del plazo).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS aviso_actualizacion (
+    id_aviso     SERIAL PRIMARY KEY,
+    id_usuario   INTEGER NOT NULL REFERENCES usuario(id_usuario) ON DELETE CASCADE,
+    fecha_limite DATE NOT NULL,
+    umbral       INTEGER NOT NULL,
+    estado       VARCHAR(10) NOT NULL,
+    detalle      TEXT,
+    fecha_envio  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT aviso_actualizacion_unico UNIQUE (id_usuario, fecha_limite, umbral),
+    CONSTRAINT aviso_actualizacion_estado_check CHECK (estado IN ('ENVIADO', 'ERROR')),
+    CONSTRAINT aviso_actualizacion_umbral_check CHECK (umbral IN (30, 15, 7, 1))
+);
+
+CREATE INDEX IF NOT EXISTS idx_aviso_actualizacion_fecha
+    ON aviso_actualizacion (fecha_envio DESC);
+
+-- ---------------------------------------------------------------------------
 -- Fase 13: las reglas de integridad y vigencia en el motor de datos están en
 -- docs/triggers.sql (se aplican con scripts/migracion_fase13.py).
 -- ---------------------------------------------------------------------------

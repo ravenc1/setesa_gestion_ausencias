@@ -1,0 +1,72 @@
+name: Recordatorios de actualización de datos
+
+# Fase 15: todos los días a las 08:00 de Guatemala (14:00 UTC) se escribe a
+# los Consultores y a Contabilidad y RR.HH. cuyo plazo de 6 meses para
+# actualizar "Mis datos" vence en 30, 15, 7 o 1 día(s).
+#
+# Secretos del repositorio (Settings > Secrets and variables > Actions):
+#   DATABASE_URL   cadena del *Session pooler* de Supabase (IPv4)
+#   SMTP_HOST, SMTP_PORT, SMTP_USUARIO, SMTP_PASSWORD, SMTP_REMITENTE (opcional)
+# Variable del repositorio (opcional): APP_URL, enlace a la aplicación.
+#
+# Si faltan los secretos, la tarea termina sin hacer nada.
+
+on:
+  schedule:
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+    inputs:
+      simular:
+        description: "Solo listar a quién se escribiría (sin enviar)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: recordatorios
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_REMITENTE: ${{ secrets.SMTP_REMITENTE }}
+      APP_URL: ${{ vars.APP_URL }}
+
+    steps:
+      - name: Verificar configuración
+        if: env.DATABASE_URL == ''
+        run: echo "::notice::Falta el secreto DATABASE_URL; no se envían recordatorios."
+
+      - name: Descargar el repositorio
+        if: env.DATABASE_URL != ''
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        if: env.DATABASE_URL != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Instalar dependencias
+        if: env.DATABASE_URL != ''
+        run: python -m pip install -r requirements.txt
+
+      - name: Enviar recordatorios
+        if: env.DATABASE_URL != ''
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.simular }}" = "true" ]; then
+            python scripts/enviar_recordatorios.py --simular
+          else
+            python scripts/enviar_recordatorios.py
+          fi

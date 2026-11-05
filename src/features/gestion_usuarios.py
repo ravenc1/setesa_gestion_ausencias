@@ -18,6 +18,7 @@ from src.core.gestion_usuarios import (
     listar_usuarios,
     resetear_password,
 )
+from src.core.avisos import ultimos_avisos
 from src.core.recordatorios import construir_enlace_correo
 from src.core.reasignacion import contar_pendientes_coordinador
 from src.core.vigencia import DIAS_AVISO, obtener_por_vencer
@@ -315,8 +316,27 @@ def _tab_por_vencer():
     df = obtener_por_vencer()
     if df.empty:
         st.info("Ningún usuario tiene su plazo por vencer.")
+    else:
+        st.dataframe(df, hide_index=True, width="stretch")
+        st.caption(
+            "Además del aviso dentro del sistema, la tarea diaria les envía un "
+            "correo 30, 15, 7 y 1 día(s) antes del vencimiento. Los enlaces de "
+            "abajo permiten escribirles manualmente."
+        )
+
+    st.markdown("#### ✉️ Últimos correos de recordatorio")
+    try:
+        df_avisos = ultimos_avisos()
+    except Exception:
+        df_avisos = None
+    if df_avisos is None or df_avisos.empty:
+        st.info("Aún no se han enviado correos de recordatorio.")
+    else:
+        st.dataframe(df_avisos, hide_index=True, width="stretch")
+
+    if df.empty:
         return
-    st.dataframe(df, hide_index=True, width="stretch")
+    st.markdown("#### 📨 Escribir manualmente")
     for fila in df.itertuples():
         enlace = construir_enlace_correo(
             fila.correo_institucional,
