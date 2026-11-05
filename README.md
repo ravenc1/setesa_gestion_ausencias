@@ -441,6 +441,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 | `scripts/migracion_fase8.py` | Crea la tabla `recordatorio` y sus índices (R-11) |
 | `scripts/migracion_fase9.py` | Crea el rol IT y `usuario_log`; con `--usuario-demo` añade la cuenta IT de prueba (Fase 9) |
 | `scripts/instalar_produccion.py` | Instalador limpio de producción (Fase 26): esquema, migraciones sin cuentas demo, bucket y primer usuario IT |
+| `scripts/respaldo.py` | `respaldar` / `restaurar CARPETA --confirmar-reemplazo [--simular]`: respaldo completo de tablas y archivos (Fase 26) |
 | `scripts/vigencia_semestral.py` | Ejecuta la baja lógica si venció el semestre (`--forzar` para pruebas) |
 | `scripts/hash_passwords.py` | Convierte contraseñas heredadas a PBKDF2 |
 

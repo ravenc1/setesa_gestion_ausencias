@@ -819,7 +819,7 @@ la base de datos es de pocos milisegundos.
 - [x] `scripts/instalar_produccion.py`: instalador limpio (esquema + migraciones estructurales sin cuentas de demostración + bucket privado + único usuario IT con cambio de contraseña obligatorio). Se niega a correr sobre una base con usuarios o igual a la de pruebas.
 - [x] `render.yaml`: Render en Oregón, plan gratuito (temporal, mientras SETESA aprueba el presupuesto).
 - [x] Instalador ejecutado en producción (2026-11-05): 13 tablas, 27 triggers, pg_cron, bucket privado `expedientes`, 22 motivos, 30 feriados y un único usuario IT. Esquema comparado con la base de pruebas: columnas, restricciones, índices, triggers, funciones y roles idénticos.
-- [ ] Respaldo y restauración de la base de producción.
+- [x] `scripts/respaldo.py`: respaldo completo (13 tablas en .jsonl + archivos del bucket con SHA-256 + manifiesto) y restauración transaccional (todo o nada, con `--simular`). Ensayado con rollback en pruebas y en producción.
 - [ ] Publicar en Render, configurar secretos y SMTP, ensayar el flujo completo en la URL real.
 - [ ] Etiqueta `v1.0.0` tras el ensayo.
 
