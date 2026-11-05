@@ -1,0 +1,37 @@
+# Render (prototipo): plan gratuito, región Oregón (junto a Supabase us-west-2).
+# Los secretos se cargan en el panel de Render (sync: false); no van aquí.
+services:
+  - type: web
+    name: setesa-workflow
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: streamlit run app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: DATABASE_URL
+        sync: false
+      - key: FERNET_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: expedientes
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USUARIO
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_REMITENTE
+        sync: false
+      - key: SOPORTE_CORREO
+        sync: false
+      - key: APP_URL
+        sync: false

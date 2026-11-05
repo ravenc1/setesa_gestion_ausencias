@@ -215,8 +215,8 @@ La migración de la Fase 8:
 
 La migración de la Fase 9:
 - crea el rol `IT` y la tabla `usuario_log` con sus índices;
-- con `--usuario-demo`, agrega una cuenta IT temporal
-  (`it.prueba@setesa.gt`); cámbiela o elimínela antes de la entrega.
+- con `--usuario-demo`, agrega una cuenta IT temporal de prueba;
+  cámbiela o elimínela antes de la entrega.
 
 ---
 
@@ -440,6 +440,9 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 | `scripts/migracion_fase7.py` | Crea el rol Contabilidad; con `--usuario-demo` añade la cuenta de prueba (HU-03) |
 | `scripts/migracion_fase8.py` | Crea la tabla `recordatorio` y sus índices (R-11) |
 | `scripts/migracion_fase9.py` | Crea el rol IT y `usuario_log`; con `--usuario-demo` añade la cuenta IT de prueba (Fase 9) |
+| `scripts/instalar_produccion.py` | Instalador limpio de producción (Fase 26): esquema, migraciones sin cuentas demo, bucket y primer usuario IT |
+| `docs/DESPLIEGUE.md` §8b | Despliegue del prototipo en Render (plan gratuito) |
+| `scripts/respaldo.py` | `respaldar` / `restaurar CARPETA --confirmar-reemplazo [--simular]`: respaldo completo de tablas y archivos (Fase 26) |
 | `scripts/vigencia_semestral.py` | Ejecuta la baja lógica si venció el semestre (`--forzar` para pruebas) |
 | `scripts/hash_passwords.py` | Convierte contraseñas heredadas a PBKDF2 |
 
