@@ -9,6 +9,7 @@ from urllib.parse import quote
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.crypto import cifrar, descifrar_dataframe
 from src.core.database import get_connection, get_engine
 from src.core.logging_config import obtener_logger
@@ -65,6 +66,7 @@ def _resolver_destinatario(cursor, id_coordinador):
     return cursor.fetchone()
 
 
+@escritura
 def registrar_recordatorio(id_solicitud, id_emisor, mensaje=None):
     """Registra un recordatorio del consultor dueño del expediente.
 
@@ -180,6 +182,7 @@ def registrar_recordatorio(id_solicitud, id_emisor, mensaje=None):
         conn.close()
 
 
+@lectura(ttl=15)
 def obtener_recordatorios_pendientes(id_destinatario):
     """Recordatorios aún no atendidos de un Coordinador GTC."""
     engine = get_engine()

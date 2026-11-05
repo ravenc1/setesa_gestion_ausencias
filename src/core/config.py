@@ -10,6 +10,14 @@ FIRMAS_DIR = STORAGE_DIR / "firmas"
 LOG_DIR = STORAGE_DIR / "logs"
 
 
+SOPORTE_CORREO_DEFAULT = "soporte-it@setesagt.com"
+
+
+def soporte_correo():
+    """Correo de soporte de IT que se muestra en el inicio de sesión y el pie."""
+    return obtener_variable("SOPORTE_CORREO") or SOPORTE_CORREO_DEFAULT
+
+
 def obtener_variable(nombre):
     """Lee una variable desde el entorno o desde los secrets de Streamlit.
 

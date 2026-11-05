@@ -3,7 +3,7 @@
 # Se ejecutan en el servidor, no solo en el formulario, para que ninguna
 # solicitud pueda saltarse las reglas aunque se llame al servicio directamente.
 
-from src.core.vacaciones import TIPO_VACACION, obtener_saldo_vacaciones
+from src.core.vacaciones import TIPO_VACACION, calcular_saldo_vacaciones
 
 
 class ValidacionError(ValueError):
@@ -28,7 +28,7 @@ def validar_saldo_vacaciones(
     if tipo_ausencia != TIPO_VACACION:
         return None
 
-    saldo = obtener_saldo_vacaciones(
+    saldo = calcular_saldo_vacaciones(
         id_usuario, anio=anio, fecha_referencia=fecha_inicio
     )
     if dias_solicitados > saldo["disponibles"]:

@@ -2,9 +2,11 @@
 
 import pandas as pd
 
+from src.core.cache import lectura
 from src.core.database import get_engine
 
 
+@lectura(ttl=60)
 def listar_usuarios_por_rol(nombre_rol, solo_vigentes=True):
     """Devuelve los usuarios de un rol, ordenados por nombre."""
     engine = get_engine()
@@ -23,6 +25,25 @@ def listar_usuarios_por_rol(nombre_rol, solo_vigentes=True):
     query += " ORDER BY u.nombre_completo"
 
     return pd.read_sql_query(query, engine, params=tuple(params))
+
+
+@lectura(ttl=60)
+def listar_colaboradores():
+    """Todos los consultores (vigentes e inactivos) para el filtro del repositorio."""
+    engine = get_engine()
+    if engine is None:
+        return pd.DataFrame(columns=["id_usuario", "nombre_completo", "vigente"])
+    return pd.read_sql_query(
+        """
+        SELECT u.id_usuario, u.nombre_completo,
+               COALESCE(u.estado_vigencia, TRUE) AS vigente
+        FROM usuario u
+        JOIN rol r ON u.id_rol = r.id_rol
+        WHERE r.nombre_rol = 'Consultor'
+        ORDER BY u.nombre_completo
+        """,
+        engine,
+    )
 
 
 def listar_coordinadores(solo_vigentes=True):

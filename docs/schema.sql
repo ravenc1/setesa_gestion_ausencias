@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS usuario (
     codigo_empleado      VARCHAR(50),
     telefono             TEXT,
     fecha_actualizacion_datos TIMESTAMP NOT NULL DEFAULT NOW(),
+    -- Fase 24: TRUE tras una contraseña temporal de IT; se exige cambiarla.
+    debe_cambiar_password BOOLEAN NOT NULL DEFAULT FALSE,
     CONSTRAINT usuario_dias_vacaciones_check CHECK (
         dias_vacaciones_asignados >= 0
     )
@@ -154,7 +156,7 @@ CREATE TABLE IF NOT EXISTS usuario_log (
     detalle     TEXT,
     CONSTRAINT usuario_log_accion_check CHECK (
         accion IN ('CREACION', 'EDICION', 'BAJA', 'REACTIVACION', 'RESET_PASSWORD',
-                   'ACTUALIZACION_DATOS', 'DESBLOQUEO')
+                   'ACTUALIZACION_DATOS', 'DESBLOQUEO', 'CAMBIO_PASSWORD')
     )
 );
 

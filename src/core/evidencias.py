@@ -14,6 +14,7 @@ import uuid
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.database import get_connection, get_engine
 from src.core.logging_config import obtener_logger
 from src.services import almacenamiento
@@ -105,6 +106,7 @@ def insertar_evidencias(cursor, id_solicitud, id_usuario, evidencias):
         )
 
 
+@escritura
 def agregar_evidencias(id_solicitud, id_usuario, archivos):
     """Adjunta evidencias a una solicitud en trámite del propio consultor."""
     evidencias = subir_evidencias(archivos)
@@ -141,6 +143,7 @@ def _puede_ver(cursor, id_solicitud, id_usuario):
     return dueno == id_usuario or rol in ROLES_CON_ACCESO
 
 
+@lectura(ttl=15)
 def listar_evidencias(id_solicitud, id_usuario):
     """Evidencias de la solicitud, si el usuario puede verlas."""
     conn = get_connection()

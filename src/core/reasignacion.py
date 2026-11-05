@@ -9,6 +9,7 @@
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.database import get_connection, get_engine
 from src.core.logging_config import obtener_logger
 from src.core.vigencia import marcar_actividad
@@ -21,6 +22,7 @@ class ReasignacionError(Exception):
     """La reasignación no se puede aplicar."""
 
 
+@lectura(ttl=15)
 def listar_expedientes_reasignables():
     """Expedientes que esperan la firma del banco, con su coordinador actual.
 
@@ -84,6 +86,7 @@ def _coordinador_vigente(cursor, id_coordinador):
     return cursor.fetchone()
 
 
+@escritura
 def reasignar_coordinador(id_solicitud, id_nuevo, id_ejecutor, motivo):
     """Asigna el expediente a otro Coordinador GTC vigente.
 

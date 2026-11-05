@@ -30,6 +30,7 @@ COLUMNAS_EXPORTACION = [
 def filtrar_solicitudes(
     df,
     nombre=None,
+    id_usuario=None,
     estado=None,
     tipo=None,
     fecha_desde=None,
@@ -42,6 +43,9 @@ def filtrar_solicitudes(
     resultado = df.copy()
     if resultado.empty:
         return resultado
+
+    if id_usuario is not None and "id_usuario" in resultado:
+        resultado = resultado[resultado["id_usuario"] == id_usuario]
 
     if nombre and str(nombre).strip():
         resultado = resultado[

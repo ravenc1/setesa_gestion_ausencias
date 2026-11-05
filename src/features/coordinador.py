@@ -3,6 +3,7 @@
 import streamlit as st
 import pandas as pd
 
+from src.core.cache import lectura
 from src.core.database import get_engine
 from src.core.logging_config import obtener_logger
 from src.core.workflow import (
@@ -26,12 +27,9 @@ from src.services.utils_firma import canvas_to_base64
 logger = obtener_logger("setesa.coordinador")
 
 
-def obtener_solicitudes_pendientes(id_coordinador):
-    """Solicitudes que esperan la firma de ESTE Coordinador GTC.
-
-    Tabla 9 de la tesis: la bandeja muestra solo las solicitudes asignadas a
-    su equipo, es decir, las que el consultor dirigió a este jefe inmediato.
-    """
+@lectura(ttl=15)
+def _leer_pendientes(id_coordinador):
+    """Lectura guardada unos segundos; si falla, lanza (los errores no se guardan)."""
     engine = get_engine()
     if engine is None:
         return pd.DataFrame()
@@ -45,12 +43,21 @@ def obtener_solicitudes_pendientes(id_coordinador):
           AND s.id_coordinador = %s
         ORDER BY s.fecha_creacion ASC
     """
+    return pd.read_sql_query(
+        query,
+        engine,
+        params=(ESTADO_PENDIENTE_FIRMA_COORDINADOR, id_coordinador),
+    )
+
+
+def obtener_solicitudes_pendientes(id_coordinador):
+    """Solicitudes que esperan la firma de ESTE Coordinador GTC.
+
+    Tabla 9 de la tesis: la bandeja muestra solo las solicitudes asignadas a
+    su equipo, es decir, las que el consultor dirigió a este jefe inmediato.
+    """
     try:
-        return pd.read_sql_query(
-            query,
-            engine,
-            params=(ESTADO_PENDIENTE_FIRMA_COORDINADOR, id_coordinador),
-        )
+        return _leer_pendientes(id_coordinador)
     except Exception as e:
         logger.exception("Error al obtener las solicitudes pendientes")
         st.error(f"Error al obtener datos: {e}")

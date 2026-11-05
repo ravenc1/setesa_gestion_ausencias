@@ -8,6 +8,7 @@
 
 import pandas as pd
 
+from src.core.cache import lectura
 from src.core.database import get_engine
 from src.core.vigencia import DIAS_AVISO, ROLES_CON_ACTUALIZACION
 
@@ -26,6 +27,7 @@ def formatear_duracion(duracion):
     return f"{mins} min"
 
 
+@lectura(ttl=30)
 def obtener_tiempos_resolucion():
     """Solicitudes resueltas con las fechas de cada hito."""
     engine = get_engine()
@@ -89,6 +91,7 @@ def calcular_tiempos(df):
     }
 
 
+@lectura(ttl=30)
 def obtener_usuarios():
     engine = get_engine()
     if engine is None:

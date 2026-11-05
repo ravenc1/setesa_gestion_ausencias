@@ -6,6 +6,7 @@
 # pestaña o navegador no lo reinicia. Se lleva por correo escrito, exista o no
 # la cuenta, para que la respuesta no revele qué correos están registrados.
 
+from src.core.config import soporte_correo
 from src.core.logging_config import obtener_logger
 
 logger = obtener_logger("setesa.intentos")
@@ -21,7 +22,8 @@ class CuentaBloqueada(Exception):
         self.minutos = minutos
         super().__init__(
             "Demasiados intentos fallidos. Por seguridad, el acceso está "
-            f"bloqueado; intente de nuevo en {minutos} minuto(s)."
+            f"bloqueado; se libera solo en {minutos} minuto(s) o puede pedir a "
+            f"IT que lo desbloquee ({soporte_correo()})."
         )
 
 

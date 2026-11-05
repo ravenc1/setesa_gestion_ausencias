@@ -15,6 +15,7 @@
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.database import get_connection, get_engine
 from src.core.logging_config import obtener_logger
 
@@ -98,6 +99,7 @@ def _consulta_inactivos(id_excluido=None):
     return query, tuple(params)
 
 
+@lectura(ttl=30)
 def obtener_por_vencer(dias=DIAS_AVISO):
     """Usuarios vigentes cuyo plazo de actualización vence en ``dias`` o menos."""
     engine = get_engine()
@@ -124,6 +126,7 @@ def obtener_por_vencer(dias=DIAS_AVISO):
     )
 
 
+@lectura(ttl=30)
 def obtener_inactivos(id_excluido=None):
     """Lista los usuarios que serían dados de baja (sin modificar nada)."""
     engine = get_engine()
@@ -137,6 +140,7 @@ def obtener_inactivos(id_excluido=None):
     )
 
 
+@lectura(ttl=30)
 def obtener_dados_de_baja():
     """Lista los usuarios con baja lógica (estado_vigencia = FALSE)."""
     engine = get_engine()
@@ -153,6 +157,7 @@ def obtener_dados_de_baja():
     return pd.read_sql_query(query, engine)
 
 
+@escritura
 def ejecutar_depuracion(id_ejecutor=None, accion=ACCION_DEPURACION):
     """Aplica baja lógica a los usuarios inactivos y registra la ejecución.
 
@@ -221,6 +226,7 @@ def ejecutar_depuracion(id_ejecutor=None, accion=ACCION_DEPURACION):
         conn.close()
 
 
+@escritura
 def reactivar_usuario(id_usuario, id_ejecutor=None):
     """Reactiva un usuario dado de baja y registra la acción. Devuelve id_log."""
     conn = get_connection()
@@ -300,6 +306,7 @@ def ejecutar_si_corresponde(id_ejecutor=None):
     return len(df_afectados), id_log
 
 
+@lectura(ttl=30)
 def obtener_historial_vigencia(limite=10):
     """Devuelve las últimas ejecuciones/reactivaciones para el panel."""
     engine = get_engine()

@@ -8,6 +8,7 @@ import datetime
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core.database import get_connection, get_engine
 
 
@@ -21,6 +22,7 @@ def _a_fecha(valor):
     return valor
 
 
+@lectura(ttl=300)
 def fechas_feriados(desde, hasta):
     """Devuelve el conjunto de fechas feriadas en el rango (inclusive)."""
     desde = _a_fecha(desde)
@@ -43,6 +45,7 @@ def fechas_feriados(desde, hasta):
         conn.close()
 
 
+@lectura(ttl=60)
 def listar_feriados(anio=None):
     """Devuelve el catálogo ordenado por fecha (opcionalmente por año)."""
     engine = get_engine()
@@ -58,6 +61,7 @@ def listar_feriados(anio=None):
     return pd.read_sql_query(query, engine, params=params)
 
 
+@escritura
 def crear_feriado(fecha, nombre):
     """Crea o actualiza el feriado de una fecha. Devuelve su id."""
     fecha = _a_fecha(fecha)
@@ -89,6 +93,7 @@ def crear_feriado(fecha, nombre):
         conn.close()
 
 
+@escritura
 def eliminar_feriado(id_feriado):
     """Elimina un feriado del catálogo. Devuelve True si existía."""
     conn = get_connection()

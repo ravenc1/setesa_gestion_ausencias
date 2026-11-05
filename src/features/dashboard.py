@@ -4,6 +4,7 @@
 import pandas as pd
 import streamlit as st
 
+from src.core.cache import lectura
 from src.core.database import get_engine
 from src.core.indicadores import (
     calcular_tiempos,
@@ -37,24 +38,26 @@ from src.core.workflow import (
 )
 from src.services.documentos import (
     generar_pdf_solicitud,
-    preparar_pdf_descarga,
-    verificar_integridad_pdf,
+    obtener_pdf_final_verificado,
 )
 from src.features.evidencias import mostrar_evidencias
 from src.services.utils_firma import canvas_to_base64
+from src.core.motivos import listar_motivos
+from src.core.usuarios import listar_colaboradores
 from src.ui.estilos import colorear_estados
 
 logger = obtener_logger("setesa.dashboard")
 
 
-def obtener_solicitudes():
-    """Recupera todas las solicitudes con el nombre del colaborador."""
+@lectura(ttl=15)
+def _leer_solicitudes():
+    """Lectura guardada unos segundos; si falla, lanza (los errores no se guardan)."""
     engine = get_engine()
     if engine is None:
         return pd.DataFrame()
 
     query = """
-        SELECT s.id_solicitud, u.nombre_completo, s.tipo_ausencia,
+        SELECT s.id_solicitud, s.id_usuario, u.nombre_completo, s.tipo_ausencia,
                s.fecha_inicio, s.fecha_fin, s.dias_solicitados,
                s.estado_workflow, s.resolucion, s.fecha_creacion,
                s.ruta_pdf, s.pdf_hash
@@ -62,8 +65,13 @@ def obtener_solicitudes():
         JOIN usuario u ON s.id_usuario = u.id_usuario
         ORDER BY s.fecha_creacion DESC
     """
+    return pd.read_sql_query(query, engine)
+
+
+def obtener_solicitudes():
+    """Recupera todas las solicitudes con el nombre del colaborador."""
     try:
-        return pd.read_sql_query(query, engine)
+        return _leer_solicitudes()
     except Exception as e:
         logger.exception("Error al obtener las solicitudes del dashboard")
         st.error(f"Error al obtener solicitudes: {e}")
@@ -109,6 +117,36 @@ def _mostrar_kpis(kpis):
         f"Resoluciones: ✅ {kpis['aprobadas']} aprobada(s) · "
         f"⛔ {kpis['denegadas']} denegada(s)."
     )
+
+
+def _opciones_colaborador():
+    """{etiqueta: (id_usuario, vigente)} con todos los consultores registrados."""
+    opciones = {"Todos": (None, True)}
+    try:
+        colaboradores = listar_colaboradores()
+    except Exception as e:
+        logger.warning("No se pudo cargar la lista de colaboradores: %s", e)
+        return opciones
+    repetidos = colaboradores["nombre_completo"].duplicated(keep=False)
+    for fila, repetido in zip(colaboradores.itertuples(), repetidos):
+        etiqueta = fila.nombre_completo
+        if repetido:
+            etiqueta += f" (#{fila.id_usuario})"
+        if not fila.vigente:
+            etiqueta += " — inactivo"
+        opciones[etiqueta] = (int(fila.id_usuario), bool(fila.vigente))
+    return opciones
+
+
+def _opciones_tipo(df_solicitudes):
+    """Todos los motivos del catálogo (y los que ya figuren en expedientes)."""
+    try:
+        catalogo = listar_motivos()["nombre"].tolist()
+    except Exception as e:
+        logger.warning("No se pudo cargar el catálogo de motivos: %s", e)
+        catalogo = []
+    usados = df_solicitudes["tipo_ausencia"].dropna().astype(str).unique().tolist()
+    return ["Todos"] + catalogo + sorted(t for t in usados if t not in catalogo)
 
 
 def _mostrar_indicadores_usuarios():
@@ -169,7 +207,7 @@ def _mostrar_tabla(df_filtrado):
 
     inicio = (pagina - 1) * tam_pagina
     vista = df_filtrado.iloc[inicio : inicio + tam_pagina].drop(
-        columns=["ruta_pdf"], errors="ignore"
+        columns=["ruta_pdf", "id_usuario"], errors="ignore"
     )
     if "resolucion" in vista:
         vista = vista.assign(resolucion=vista["resolucion"].fillna("—"))
@@ -177,6 +215,12 @@ def _mostrar_tabla(df_filtrado):
     st.caption(
         f"Mostrando {len(vista)} de {len(df_filtrado)} expedientes filtrados."
     )
+
+
+@st.cache_resource(ttl=600, max_entries=16, show_spinner=False)
+def _pdf_final(id_solicitud):
+    """PDF final verificado; es inmutable, por eso se guarda 10 minutos."""
+    return obtener_pdf_final_verificado(id_solicitud)
 
 
 def _mostrar_descargas(df_filtrado):
@@ -198,7 +242,7 @@ def _mostrar_descargas(df_filtrado):
                 format_func=lambda valor: _etiqueta_solicitud(finalizadas, valor),
             )
             try:
-                nombre_pdf, contenido = preparar_pdf_descarga(id_pdf)
+                nombre_pdf, contenido, integridad = _pdf_final(int(id_pdf))
             except Exception as e:
                 logger.exception("No se pudo preparar el PDF final %s", id_pdf)
                 st.error(f"No se pudo preparar el PDF final: {e}")
@@ -210,7 +254,6 @@ def _mostrar_descargas(df_filtrado):
                     mime="application/pdf",
                     type="primary",
                 )
-                integridad = verificar_integridad_pdf(id_pdf)
                 if integridad["estado"] == "ok":
                     st.success("🔐 Integridad verificada (SHA-256).")
                 elif integridad["estado"] == "alterado":
@@ -338,20 +381,24 @@ def mostrar_dashboard():
 
     f_col1, f_col2, f_col3 = st.columns(3)
     with f_col1:
-        filtro_nombre = st.text_input("🔍 Buscar por nombre de colaborador")
+        colaboradores = _opciones_colaborador()
+        eleccion = st.selectbox("👤 Colaborador", list(colaboradores))
+        filtro_id_usuario, colaborador_activo = colaboradores[eleccion]
     with f_col2:
         filtro_estado = st.selectbox(
             "📌 Estado del workflow", ["Todos"] + ESTADOS_WORKFLOW
         )
     with f_col3:
-        tipos = ["Todos"] + sorted(
-            df_solicitudes["tipo_ausencia"]
-            .dropna()
-            .astype(str)
-            .unique()
-            .tolist()
+        filtro_tipo = st.selectbox(
+            "🏷️ Tipo de incidencia", _opciones_tipo(df_solicitudes)
         )
-        filtro_tipo = st.selectbox("🏷️ Tipo de incidencia", tipos)
+
+    if filtro_id_usuario is not None and not colaborador_activo:
+        st.warning(
+            "Este colaborador se encuentra **inactivo** en el sistema: no "
+            "actualizó sus datos en el plazo de 6 meses o ya no forma parte de "
+            "SETESA. Sus expedientes anteriores se conservan y aparecen abajo."
+        )
 
     f_col4, f_col5 = st.columns(2)
     with f_col4:
@@ -366,7 +413,7 @@ def mostrar_dashboard():
     try:
         df_filtrado = filtrar_solicitudes(
             df_solicitudes,
-            nombre=filtro_nombre,
+            id_usuario=filtro_id_usuario,
             estado=filtro_estado,
             tipo=filtro_tipo,
             fecha_desde=fecha_desde,

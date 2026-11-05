@@ -17,6 +17,7 @@ import re
 
 import pandas as pd
 
+from src.core.cache import escritura, lectura
 from src.core import intentos
 from src.core.database import get_connection, get_engine
 from src.core.logging_config import obtener_logger
@@ -155,6 +156,7 @@ def _auditar(cursor, id_ejecutor, id_afectado, accion, detalle=None):
     )
 
 
+@lectura(ttl=300)
 def listar_roles():
     """Roles disponibles para asignar."""
     engine = get_engine()
@@ -165,6 +167,7 @@ def listar_roles():
     )
 
 
+@lectura(ttl=20)
 def listar_usuarios():
     """Usuarios con su rol, vigencia, actividad y saldo de vacaciones del año."""
     engine = get_engine()
@@ -204,6 +207,7 @@ def listar_usuarios():
     return pd.read_sql_query(query, engine)
 
 
+@escritura
 def crear_usuario(
     id_ejecutor,
     nombre_completo,
@@ -257,6 +261,12 @@ def crear_usuario(
                     ),
                 )
                 id_usuario = cursor.fetchone()[0]
+                # Fase 24: la contraseña inicial es temporal.
+                cursor.execute(
+                    "UPDATE usuario SET debe_cambiar_password = TRUE "
+                    "WHERE id_usuario = %s",
+                    (id_usuario,),
+                )
                 _auditar(
                     cursor,
                     id_ejecutor,
@@ -276,6 +286,7 @@ def crear_usuario(
         conn.close()
 
 
+@escritura
 def editar_usuario(
     id_ejecutor,
     id_usuario,
@@ -375,6 +386,7 @@ def editar_usuario(
         conn.close()
 
 
+@escritura
 def cambiar_estado_usuario(id_ejecutor, id_usuario, activo):
     """Aplica baja lógica o reactivación, con protecciones y auditoría."""
     conn = get_connection()
@@ -459,6 +471,7 @@ def cambiar_estado_usuario(id_ejecutor, id_usuario, activo):
         conn.close()
 
 
+@escritura
 def resetear_password(id_ejecutor, id_usuario, password):
     """Define una contraseña nueva con la política vigente."""
     clave = validar_password(password)
@@ -479,8 +492,10 @@ def resetear_password(id_ejecutor, id_usuario, password):
                         f"No existe el usuario con id {id_usuario}."
                     )
 
+                # Fase 24: es una contraseña temporal; el usuario deberá cambiarla.
                 cursor.execute(
-                    "UPDATE usuario SET password_hash = %s WHERE id_usuario = %s",
+                    "UPDATE usuario SET password_hash = %s, "
+                    "debe_cambiar_password = TRUE WHERE id_usuario = %s",
                     (hash_password(clave), id_usuario),
                 )
                 # Fase 20: una contraseña nueva también levanta el bloqueo.
@@ -494,7 +509,7 @@ def resetear_password(id_ejecutor, id_usuario, password):
                     id_ejecutor,
                     id_usuario,
                     ACCION_RESET_PASSWORD,
-                    "Contraseña restablecida por IT",
+                    "Contraseña temporal asignada por IT",
                 )
         logger.info(
             "Contraseña del usuario %s restablecida por %s",
@@ -505,6 +520,7 @@ def resetear_password(id_ejecutor, id_usuario, password):
         conn.close()
 
 
+@lectura(ttl=15)
 def listar_bloqueos():
     """Correos con el acceso bloqueado en este momento (Fase 20)."""
     engine = get_engine()
@@ -523,6 +539,7 @@ def listar_bloqueos():
     )
 
 
+@escritura
 def desbloquear_acceso(id_ejecutor, correo):
     """IT levanta el bloqueo por intentos fallidos de un correo."""
     conn = get_connection()
@@ -552,6 +569,7 @@ def desbloquear_acceso(id_ejecutor, correo):
         conn.close()
 
 
+@lectura(ttl=20)
 def listar_auditoria(limite=200):
     """Últimas acciones de gestión, con nombres de ejecutor y afectado."""
     engine = get_engine()

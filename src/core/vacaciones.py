@@ -6,17 +6,19 @@
 
 import datetime
 
+from src.core.cache import lectura
 from src.core.database import get_connection
 
 DIAS_VACACIONES_DEFAULT = 15
 TIPO_VACACION = "VACACION"
 
 
-def obtener_saldo_vacaciones(id_usuario, anio=None, fecha_referencia=None):
-    """Devuelve asignados, usados y disponibles del usuario en el año.
+def calcular_saldo_vacaciones(id_usuario, anio=None, fecha_referencia=None):
+    """Calcula asignados, usados y disponibles del usuario directo de la base.
 
     `fecha_referencia` permite calcular el saldo del año de la solicitud;
-    si no se indica, se usa el año en curso.
+    si no se indica, se usa el año en curso. Es la lectura que usan las
+    validaciones de negocio: nunca viene de una copia temporal.
     """
     if anio is None:
         referencia = fecha_referencia or datetime.date.today()
@@ -66,3 +68,9 @@ def obtener_saldo_vacaciones(id_usuario, anio=None, fecha_referencia=None):
         "usados": usados,
         "disponibles": int(asignados) - usados,
     }
+
+
+@lectura(ttl=20)
+def obtener_saldo_vacaciones(id_usuario, anio=None, fecha_referencia=None):
+    """Igual que ``calcular_saldo_vacaciones``, con copia temporal para la pantalla."""
+    return calcular_saldo_vacaciones(id_usuario, anio, fecha_referencia)
