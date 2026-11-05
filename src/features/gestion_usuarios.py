@@ -18,6 +18,7 @@ from src.core.gestion_usuarios import (
     listar_usuarios,
     resetear_password,
 )
+from src.core.reasignacion import contar_pendientes_coordinador
 from src.core.security import ROL_IT, rol_autorizado
 
 COLUMNAS_USUARIOS = {
@@ -153,7 +154,17 @@ def _acciones_acceso(fila):
                 except (OperacionNoPermitida, GestionUsuariosError) as e:
                     st.error(f"⚠️ {e}")
                 else:
-                    _flash("warning", f"{fila['nombre_completo']} quedó dado de baja.")
+                    aviso = f"{fila['nombre_completo']} quedó dado de baja."
+                    # Fase 12: sus expedientes sin firmar quedan detenidos.
+                    if fila["nombre_rol"] == "Coordinador GTC":
+                        pendientes = contar_pendientes_coordinador(id_usuario)
+                        if pendientes:
+                            aviso += (
+                                f" Tenía {pendientes} expediente(s) esperando "
+                                "su visto bueno: Gerencia debe reasignarlos "
+                                "en la pestaña «Reasignar Coordinador»."
+                            )
+                    _flash("warning", aviso)
                     st.rerun()
         else:
             if st.button("✅ Reactivar", key=f"reactivar_{id_usuario}"):
