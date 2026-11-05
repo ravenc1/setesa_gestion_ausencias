@@ -54,7 +54,9 @@ CREATE TABLE IF NOT EXISTS solicitud (
     estado_workflow  VARCHAR(50) NOT NULL DEFAULT 'Ingresada',
     ruta_pdf         VARCHAR(255),
     fecha_creacion   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    jefe_gtc         VARCHAR(150),
+    jefe_gtc         VARCHAR(150),  -- nombre visible del jefe (PDF)
+    -- Fase 11: Coordinador GTC asignado; filtra su bandeja (Tabla 9).
+    id_coordinador   INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
     puesto           VARCHAR(150),
     codigo_empleado  VARCHAR(50),
     dias_solicitados INTEGER,
@@ -73,6 +75,9 @@ CREATE TABLE IF NOT EXISTS solicitud (
         )
     )
 );
+
+CREATE INDEX IF NOT EXISTS idx_solicitud_coordinador_estado
+    ON solicitud (id_coordinador, estado_workflow);
 
 -- ---------------------------------------------------------------------------
 -- Historial de estados (trazabilidad / auditoría)

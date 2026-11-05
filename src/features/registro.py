@@ -26,7 +26,7 @@ from src.core.workflow import ESTADO_PENDIENTE_FIRMA_COORDINADOR
 
 logger = obtener_logger("setesa.registro")
 
-def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, jefe, puesto, codigo, dias, exp, firma_b64):
+def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, id_coordinador, puesto, codigo, dias, exp, firma_b64):
     """Inserta la solicitud y su historial en una sola transacción.
 
     Devuelve el id_solicitud generado o None si falla. El servicio deja la
@@ -34,7 +34,7 @@ def registrar_solicitud_firmada(id_us, tipo, f_ini, f_fin, jefe, puesto, codigo,
     """
     try:
         return registrar_solicitud(
-            id_us, tipo, f_ini, f_fin, jefe, puesto, codigo, dias, exp, firma_b64
+            id_us, tipo, f_ini, f_fin, id_coordinador, puesto, codigo, dias, exp, firma_b64
         )
     except ValidacionError as e:
         st.error(f"❌ {e}")
@@ -116,20 +116,28 @@ def mostrar_formulario():
             st.info("Complete el formulario. Al firmar electrónicamente, la solicitud se enviará al Coordinador GTC para su visto bueno.")
             col1, col2 = st.columns(2)
             with col1:
+                # El expediente se asigna al coordinador por su id de usuario:
+                # solo ese coordinador lo verá en su bandeja (Tabla 9).
                 coordinadores = listar_coordinadores()
-                opciones_jefe = coordinadores["nombre_completo"].tolist()
-                if opciones_jefe:
-                    jefe_gtc = st.selectbox(
-                        "PARA: (Jefe Inmediato GTC)", opciones_jefe
+                nombres_jefe = dict(
+                    zip(
+                        coordinadores["id_usuario"].astype(int),
+                        coordinadores["nombre_completo"],
+                    )
+                )
+                if nombres_jefe:
+                    id_coordinador = st.selectbox(
+                        "PARA: (Jefe Inmediato GTC)",
+                        list(nombres_jefe),
+                        format_func=nombres_jefe.get,
                     )
                 else:
                     st.warning(
                         "No hay usuarios vigentes con rol Coordinador GTC. "
-                        "Escriba el nombre manualmente."
+                        "Solicite a IT que registre a su jefe inmediato antes "
+                        "de enviar la solicitud."
                     )
-                    jefe_gtc = st.text_input(
-                        "PARA: (Nombre del Jefe Inmediato GTC)"
-                    )
+                    id_coordinador = None
                 puesto = st.text_input("PUESTO:")
                 fecha_inicio = st.date_input("Fecha de Inicio (Del:)", min_value=datetime.date.today())
             with col2:
@@ -169,7 +177,7 @@ def mostrar_formulario():
                 col_btn, _ = st.columns([1, 3]) 
                 with col_btn:
                     if st.button("✍️ Firmar Electrónicamente", type="primary"):
-                        if not jefe_gtc or not explicacion:
+                        if not id_coordinador or not explicacion:
                             st.error("❌ Llene todos los campos para proceder.")
                         elif dias_solicitados == 0:
                             st.error("❌ El rango seleccionado no contiene días hábiles (solo fines de semana o feriados).")
@@ -221,7 +229,7 @@ def mostrar_formulario():
                             
                             id_solicitud = registrar_solicitud_firmada(
                                 id_us, tipo_ausencia, fecha_inicio, fecha_fin,
-                                jefe_gtc, puesto, codigo, dias_solicitados,
+                                int(id_coordinador), puesto, codigo, dias_solicitados,
                                 explicacion, firma_base64,
                             )
                             if id_solicitud:

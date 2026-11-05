@@ -12,6 +12,7 @@ from src.core.workflow import (
 from src.core.security import rol_autorizado
 from src.core.recordatorios import obtener_recordatorios_pendientes
 from src.core.solicitudes import (
+    CoordinadorNoAsignado,
     FirmaRequerida,
     TransicionInvalida,
     cambiar_estado,
@@ -23,8 +24,12 @@ from src.services.utils_firma import canvas_to_base64
 logger = obtener_logger("setesa.coordinador")
 
 
-def obtener_solicitudes_pendientes():
-    """Recupera las solicitudes que esperan la firma del Coordinador GTC."""
+def obtener_solicitudes_pendientes(id_coordinador):
+    """Solicitudes que esperan la firma de ESTE Coordinador GTC.
+
+    Tabla 9 de la tesis: la bandeja muestra solo las solicitudes asignadas a
+    su equipo, es decir, las que el consultor dirigió a este jefe inmediato.
+    """
     engine = get_engine()
     if engine is None:
         return pd.DataFrame()
@@ -35,11 +40,14 @@ def obtener_solicitudes_pendientes():
         FROM solicitud s
         JOIN usuario u ON s.id_usuario = u.id_usuario
         WHERE s.estado_workflow = %s
+          AND s.id_coordinador = %s
         ORDER BY s.fecha_creacion ASC
     """
     try:
         return pd.read_sql_query(
-            query, engine, params=(ESTADO_PENDIENTE_FIRMA_COORDINADOR,)
+            query,
+            engine,
+            params=(ESTADO_PENDIENTE_FIRMA_COORDINADOR, id_coordinador),
         )
     except Exception as e:
         logger.exception("Error al obtener las solicitudes pendientes")
@@ -58,6 +66,8 @@ def firmar_aprobacion_banco(id_solicitud, id_usuario, firma_b64):
             firma_b64=firma_b64,
         )
         return True
+    except CoordinadorNoAsignado as e:
+        st.error(f"No puede aprobar: {e}")
     except FirmaRequerida as e:
         st.error(f"Debe firmar el expediente: {e}")
     except TransicionInvalida as e:
@@ -81,7 +91,7 @@ def mostrar_panel_coordinador():
         "serán enviadas a la Gerencia de SETESA para su validación final."
     )
 
-    df_pendientes = obtener_solicitudes_pendientes()
+    df_pendientes = obtener_solicitudes_pendientes(st.session_state.get("id_usuario"))
 
     # R-11: recordatorios que los consultores enviaron a este coordinador.
     df_recordatorios = obtener_recordatorios_pendientes(
