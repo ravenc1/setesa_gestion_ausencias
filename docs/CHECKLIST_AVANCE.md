@@ -752,6 +752,19 @@ formulario; el dashboard muestra tiempos promedio y usuarios inactivos. ✅ **Cu
 
 ---
 
+### Fase 22 — Prueba del flujo completo (antes de producción)
+
+- [x] `tests/test_flujo_completo.py`: 30 pasos con los cinco roles contra la base de pruebas (datos temporales que se borran al terminar; repositorio de archivos en una carpeta temporal y correo simulado).
+- [x] **Cubre**: alta de usuarios por IT y sus validaciones; inicio de sesión, bloqueo a los 5 intentos y desbloqueo; expiración de sesión; «Mis datos» (teléfono cifrado); catálogo de motivos; vacaciones con descuento de saldo; bandeja del coordinador asignado; recordatorio al banco; visto bueno y aprobación; avisos a Contabilidad y al consultor; PDF final inmutable con sello estable y detección de alteración; expediente finalizado inalterable.
+- [x] **Denegaciones** por el banco y por Gerencia (motivo y firma obligatorios, días devueltos al saldo, motivo ausente del aviso); **evidencias** (IGSS obligatoria y acceso por rol); motivo nuevo impreso como «OTROS»; **reasignación** al salir un coordinador.
+- [x] **Vigencia** (baja por no actualizar datos, reactivación con plazo nuevo, roles sin vencimiento) y **recordatorio por correo** una vez por etapa; **dashboard** e indicadores.
+- [x] **Pantallas** de los cinco roles (AppTest), inicio de sesión por formulario y arranque real del servidor de Streamlit.
+- [x] `docs/PRUEBA_MANUAL.md`: guion de 5 a 10 minutos para lo que solo se comprueba en un navegador (firma dibujada, archivos y aspecto).
+
+**Resultado:** 30 de 30 pasos en verde; la base de pruebas quedó limpia.
+Dos ajustes en la propia prueba (firma de ejemplo con fondo blanco, como las
+reales, y asignación de la sesión de IT); ningún defecto en la aplicación.
+
 ### Fase 23 — Identidad visual de SETESA (azul y blanco)
 
 - [x] **Tema** (`.streamlit/config.toml`): azul marino `#203868` y celeste `#68B0D8` del logo, fondo blanco y bordes redondeados; encabezado de tablas en azul; barra lateral azul; menú reducido de Streamlit.
