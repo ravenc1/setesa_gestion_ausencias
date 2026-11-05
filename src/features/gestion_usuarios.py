@@ -76,6 +76,10 @@ def _indice_rol(roles, nombre_rol):
 def _mostrar_tabla_usuarios(df):
     tabla = df.rename(columns=COLUMNAS_USUARIOS).copy()
     tabla["Activo"] = tabla["Activo"].map({True: "Sí", False: "No"})
+    # Coordinador, Gerencia e IT no tienen plazo de actualización de datos.
+    plazo = COLUMNAS_USUARIOS["fecha_limite_datos"]
+    if plazo in tabla:
+        tabla[plazo] = tabla[plazo].astype(object).where(tabla[plazo].notna(), "—").astype(str)
     st.dataframe(tabla, hide_index=True, width="stretch")
 
 

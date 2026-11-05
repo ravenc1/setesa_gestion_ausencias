@@ -1,0 +1,31 @@
+# Tema de SETESA: azul y blanco (colores del logo: #203868 y #68B0D8).
+# Este archivo se versiona; los secretos van en .streamlit/secrets.toml (ignorado).
+
+[theme]
+base = "light"
+primaryColor = "#203868"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#EAF2FA"
+textColor = "#1B2B4B"
+linkColor = "#2B6CB0"
+font = "sans serif"
+baseRadius = "0.6rem"
+buttonRadius = "0.6rem"
+borderColor = "#C9D9EC"
+dataframeBorderColor = "#C9D9EC"
+dataframeHeaderBackgroundColor = "#203868"
+dataframeHeaderTextColor = "#FFFFFF"
+blueColor = "#2B6CB0"
+blueBackgroundColor = "#E3EEF9"
+chartCategoricalColors = ["#203868", "#68B0D8", "#2B6CB0", "#9CC9E8", "#4A5F8F", "#B9D7EE"]
+
+[theme.sidebar]
+backgroundColor = "#203868"
+secondaryBackgroundColor = "#2D4A85"
+textColor = "#FFFFFF"
+primaryColor = "#68B0D8"
+borderColor = "#3B5A9C"
+
+[client]
+# Menú reducido: sin las opciones de desarrollo de Streamlit.
+toolbarMode = "minimal"

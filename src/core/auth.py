@@ -91,13 +91,18 @@ def login_user(email, password):
         return None
 
 def show_login():
-    st.markdown("<h2 style='text-align: center;'>SETESA</h2>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align: center; color: gray;'>Plataforma de Gestión de Ausencias y Vigencia</h4>", unsafe_allow_html=True)
-    st.write("---")
-    
+    from src.ui import estilos
+
     col1, col2, col3 = st.columns([1, 2, 1])
-    
+
     with col2:
+        if estilos.LOGO.exists():
+            st.image(str(estilos.LOGO), width="stretch")
+        st.markdown(
+            '<div class="setesa-login-titulo">Plataforma de Gestión de Ausencias</div>'
+            '<div class="setesa-login-subtitulo">Inicie sesión con su correo registrado</div>',
+            unsafe_allow_html=True,
+        )
         with st.form("login_form"):
             email = st.text_input(
                 "Correo registrado",
@@ -107,7 +112,7 @@ def show_login():
                 ),
             )
             password = st.text_input("Contraseña", type="password")
-            submit_button = st.form_submit_button("Iniciar Sesión", width="stretch")
+            submit_button = st.form_submit_button("Iniciar Sesión", type="primary", width="stretch")
             
             if submit_button:
                 try:
