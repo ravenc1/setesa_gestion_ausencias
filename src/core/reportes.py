@@ -84,6 +84,8 @@ def calcular_kpis(df):
         "pendientes_coordinador": 0,
         "pendientes_gerencia": 0,
         "finalizadas": 0,
+        "aprobadas": 0,
+        "denegadas": 0,
     }
     if df is None or df.empty:
         return vacio
@@ -99,6 +101,15 @@ def calcular_kpis(df):
             estados.get(ESTADO_PENDIENTE_APROBACION_GERENCIA, 0)
         ),
         "finalizadas": int(estados.get(ESTADO_FINALIZADA, 0)),
+        # Fase 16: resolución de los finalizados (los anteriores, aprobados).
+        "aprobadas": int(
+            (df["resolucion"] == "Aprobada").sum()
+            if "resolucion" in df
+            else estados.get(ESTADO_FINALIZADA, 0)
+        ),
+        "denegadas": int(
+            (df["resolucion"] == "Denegada").sum() if "resolucion" in df else 0
+        ),
     }
 
 

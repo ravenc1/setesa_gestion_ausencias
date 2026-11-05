@@ -141,8 +141,9 @@ BEGIN
     IF NEW.estado_workflow IS DISTINCT FROM 'Ingresada' THEN
         RAISE EXCEPTION 'SETESA: toda solicitud debe registrarse en estado Ingresada.';
     END IF;
-    IF NEW.firma_jefe_gtc IS NOT NULL OR NEW.firma_gerencia IS NOT NULL THEN
-        RAISE EXCEPTION 'SETESA: una solicitud nueva no puede traer firmas del banco ni de Gerencia.';
+    IF NEW.firma_jefe_gtc IS NOT NULL OR NEW.firma_gerencia IS NOT NULL
+       OR NEW.resolucion IS NOT NULL THEN
+        RAISE EXCEPTION 'SETESA: una solicitud nueva no puede traer firmas del banco, de Gerencia ni resolución.';
     END IF;
     IF NOT setesa_usuario_vigente(NEW.id_usuario) THEN
         RAISE EXCEPTION 'SETESA: el usuario % no está vigente y no puede registrar solicitudes.',
@@ -198,6 +199,10 @@ BEGIN
                 AND NEW.estado_workflow = 'Pendiente de Aprobación Gerencia')
             OR (OLD.estado_workflow = 'Pendiente de Aprobación Gerencia'
                 AND NEW.estado_workflow = 'Finalizada')
+            -- Fase 16: el banco puede denegar y cerrar el flujo.
+            OR (OLD.estado_workflow = 'Pendiente de Firma Coordinador'
+                AND NEW.estado_workflow = 'Finalizada'
+                AND NEW.resolucion = 'Denegada')
         ) THEN
             RAISE EXCEPTION 'SETESA: transición no permitida: % -> %.',
                 OLD.estado_workflow, NEW.estado_workflow;
@@ -207,9 +212,34 @@ BEGIN
            AND NEW.firma_jefe_gtc IS NULL THEN
             RAISE EXCEPTION 'SETESA: el visto bueno del banco requiere la firma del Coordinador GTC.';
         END IF;
-        IF NEW.estado_workflow = 'Finalizada' AND NEW.firma_gerencia IS NULL THEN
-            RAISE EXCEPTION 'SETESA: la aprobación final requiere la firma de Gerencia.';
+        -- Fase 16: todo expediente finalizado lleva su resolución.
+        IF NEW.estado_workflow = 'Finalizada' THEN
+            IF NEW.resolucion IS NULL THEN
+                RAISE EXCEPTION 'SETESA: el expediente finalizado requiere una resolución (Aprobada o Denegada).';
+            END IF;
+            IF NEW.resolucion = 'Aprobada' AND NEW.firma_gerencia IS NULL THEN
+                RAISE EXCEPTION 'SETESA: la aprobación final requiere la firma de Gerencia.';
+            END IF;
+            IF NEW.resolucion = 'Denegada' THEN
+                IF NEW.motivo_resolucion IS NULL THEN
+                    RAISE EXCEPTION 'SETESA: la denegación requiere un motivo.';
+                END IF;
+                IF OLD.estado_workflow = 'Pendiente de Firma Coordinador'
+                   AND NEW.firma_jefe_gtc IS NULL THEN
+                    RAISE EXCEPTION 'SETESA: la denegación del banco requiere la firma del Coordinador GTC.';
+                END IF;
+                IF OLD.estado_workflow = 'Pendiente de Aprobación Gerencia'
+                   AND NEW.firma_gerencia IS NULL THEN
+                    RAISE EXCEPTION 'SETESA: la denegación de Gerencia requiere su firma.';
+                END IF;
+            END IF;
         END IF;
+    END IF;
+
+    -- La resolución solo se asigna al finalizar.
+    IF NEW.resolucion IS DISTINCT FROM OLD.resolucion
+       AND NEW.estado_workflow <> 'Finalizada' THEN
+        RAISE EXCEPTION 'SETESA: la resolución solo se registra al finalizar el expediente.';
     END IF;
 
     -- Las firmas ya estampadas no se reemplazan ni se borran.
@@ -334,9 +364,15 @@ BEGIN
         IF NEW.id_usuario IS DISTINCT FROM v_coordinador THEN
             RAISE EXCEPTION 'SETESA: solo el Coordinador GTC asignado da el visto bueno.';
         END IF;
+    ELSIF NEW.estado_anterior = 'Pendiente de Firma Coordinador'
+          AND NEW.estado_nuevo = 'Finalizada' THEN
+        -- Fase 16: denegación del banco.
+        IF NEW.id_usuario IS DISTINCT FROM v_coordinador THEN
+            RAISE EXCEPTION 'SETESA: solo el Coordinador GTC asignado puede denegar en esta etapa.';
+        END IF;
     ELSIF NEW.estado_nuevo = 'Finalizada' THEN
         IF v_rol <> 'Administrador' THEN
-            RAISE EXCEPTION 'SETESA: solo Gerencia aprueba y finaliza expedientes.';
+            RAISE EXCEPTION 'SETESA: solo Gerencia aprueba, deniega o finaliza en esta etapa.';
         END IF;
     END IF;
 

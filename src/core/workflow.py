@@ -25,6 +25,25 @@ TRANSICIONES = {
 }
 
 
+# Fase 16: el expediente termina en "Finalizada" con una resolución. El
+# Coordinador GTC (el banco no da el permiso) o Gerencia pueden denegar; la
+# denegación cierra el flujo desde su etapa y exige motivo y firma.
+RESOLUCION_APROBADA = "Aprobada"
+RESOLUCION_DENEGADA = "Denegada"
+RESOLUCIONES = (RESOLUCION_APROBADA, RESOLUCION_DENEGADA)
+
+# Etapas desde las que se puede denegar, y quién lo hace.
+ETAPAS_DENEGACION = {
+    ESTADO_PENDIENTE_FIRMA_COORDINADOR: "Coordinador GTC",
+    ESTADO_PENDIENTE_APROBACION_GERENCIA: "Administrador",
+}
+
+
+def puede_denegar(estado_actual):
+    """Indica si el expediente puede denegarse en su etapa actual."""
+    return estado_actual in ETAPAS_DENEGACION
+
+
 def estado_valido(estado):
     """Indica si el estado pertenece al catálogo del workflow."""
     return estado in ESTADOS_WORKFLOW

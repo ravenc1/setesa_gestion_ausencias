@@ -23,7 +23,7 @@ def _segmento_archivo(texto):
 def _tiene_firma(firma_b64):
     return bool(firma_b64 and isinstance(firma_b64, str) and firma_b64.strip())
 
-def generar_pdf_accion_personal(nombre_empleado, jefe_gtc, puesto, codigo, tipo_ausencia, fecha_inicio, fecha_fin, dias, explicacion, estado_workflow="Ingresada", fecha_creacion=None, firma_empleado_b64=None, firma_jefe_b64=None, firma_gerencia_b64=None, id_solicitud=None):
+def generar_pdf_accion_personal(nombre_empleado, jefe_gtc, puesto, codigo, tipo_ausencia, fecha_inicio, fecha_fin, dias, explicacion, estado_workflow="Ingresada", fecha_creacion=None, firma_empleado_b64=None, firma_jefe_b64=None, firma_gerencia_b64=None, id_solicitud=None, resolucion=None, motivo_resolucion=None, denegada_por=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -105,6 +105,19 @@ def generar_pdf_accion_personal(nombre_empleado, jefe_gtc, puesto, codigo, tipo_
     pdf.set_font("Arial", "", 10)
     pdf.multi_cell(0, 6, explicacion, border=1)
     pdf.ln(5)
+
+    # Fase 16: resolución del expediente.
+    denegada = resolucion == "Denegada"
+    if resolucion:
+        pdf.set_font("Arial", "B", 11)
+        titulo = f"RESOLUCION: {resolucion.upper()}"
+        if denegada and denegada_por:
+            titulo += f" POR {denegada_por.upper()}"
+        pdf.cell(0, 7, titulo, border=1, ln=True, align="C")
+        if denegada and motivo_resolucion:
+            pdf.set_font("Arial", "", 10)
+            pdf.multi_cell(0, 6, f"Motivo: {motivo_resolucion}", border=1)
+        pdf.ln(4)
     
     # Bloque 5: Nota Institucional
     pdf.set_font("Arial", "B", 8)
@@ -129,6 +142,8 @@ def generar_pdf_accion_personal(nombre_empleado, jefe_gtc, puesto, codigo, tipo_
     firma_gerencia = (
         "Gerencia SETESA"
         if aprobado_gerencia and _tiene_firma(firma_gerencia_b64)
+        else "(No aplica)"
+        if denegada
         else "(Pendiente Autorización)"
     )
     
