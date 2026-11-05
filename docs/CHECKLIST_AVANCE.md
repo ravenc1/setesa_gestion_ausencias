@@ -597,6 +597,27 @@ del coordinador B; A ya no puede firmarlo y B sí. ✅ **Cumplido.**
 
 ---
 
+### Fase 13 — Triggers de PostgreSQL · tesis 3.6
+
+- [x] **Vigencia automática** (`trg_usuario_vigencia`): si un usuario no protegido lleva más de 6 meses sin actividad, el próximo intento de registrarle actividad aplica la baja lógica y la audita en `vigencia_log`.
+- [x] **Depuración diaria** `setesa_depurar_vigencia()` programada con pg_cron (09:00 UTC).
+- [x] **Registro** (`trg_solicitud_insert`): nace en *Ingresada*, sin firmas de banco ni Gerencia, de un usuario vigente y hacia un Coordinador GTC vigente.
+- [x] **Transiciones** (`trg_solicitud_update`): solo las del workflow, cada una con su firma; las firmas estampadas no cambian; la reasignación solo va a un coordinador vigente.
+- [x] **Finalizada inalterable**: solo admite el sello del PDF (`ruta_pdf`, `pdf_hash`, `pdf_hash_fecha`).
+- [x] **Sin borrados** de expedientes ni de historial (`trg_solicitud_delete`, `trg_historial_inmutable`); las pruebas usan `SET LOCAL setesa.permitir_borrado = 'on'`.
+- [x] **Sin huérfanos** (`trg_solicitud_con_historial`, diferido): toda solicitud confirmada tiene historial.
+- [x] **Historial coherente** (`trg_historial_insert`): refleja el estado real y lo registra el actor de cada etapa (consultor dueño, coordinador asignado, Gerencia), siempre vigente.
+- [x] El login relee la vigencia después de marcar actividad.
+- [x] SQL en `docs/triggers.sql`, migración `scripts/migracion_fase13.py` (`--simular`, `--sin-cron`) y pruebas `tests/test_triggers.py` (15, en una transacción que se revierte).
+
+**Criterio de aceptación:** las reglas del workflow y de vigencia se cumplen
+aunque se escriba directamente en la base. ✅ **Cumplido.**
+
+**Nota:** `scripts/migracion_fase6.py` ya no puede reescribir expedientes
+finalizados; si se necesitara, debe correr con `setesa.permitir_borrado`.
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
