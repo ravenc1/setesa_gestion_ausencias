@@ -772,6 +772,26 @@ estilos usan sus selectores `data-testid`, por eso la versión está fijada en
 
 ---
 
+### Fase 24 — Ajustes tras las pruebas manuales
+
+- [x] **Rendimiento** (la app tardaba 10–16 s por clic desde Guatemala): el cuello de botella no era Streamlit sino los viajes a la base de datos (una conexión nueva a Supabase cuesta ~1 s y cada consulta ~0,25 s).
+  - **Reserva de conexiones** reutilizables (`src/core/database.py`): la conexión reutilizada cuesta 0 ms; las inactivas se validan antes de usarse.
+  - **Guardado temporal de lecturas** (`src/core/cache.py`, 15 a 300 s): catálogos, perfil, indicadores, listas y bandejas. Toda función que escribe (`@escritura`) invalida lo guardado. Las validaciones de negocio (p. ej. el saldo de vacaciones al registrar) leen siempre directo de la base.
+  - **Pestañas perezosas** en Gerencia e IT: solo se ejecuta la pestaña visible.
+  - Vigencia de la sesión revisada cada 30 s (no en cada clic); el PDF final se descarga y verifica una sola vez; el historial del consultor ya no trae ni descifra las firmas.
+  - **Resultado medido:** cualquier clic del consultor, coordinador e IT pasa de 11 / 2 / 5 s a ~0,1 s; Gerencia y Contabilidad de ~10 s a ~1 s.
+- [x] **Filtros del repositorio histórico** (Gerencia y Contabilidad y RR.HH.): selector con todos los colaboradores (los inactivos marcados; al elegir uno se avisa que está inactivo) y todos los motivos del catálogo en «Tipo de incidencia».
+- [x] **Soporte**: contacto de IT (`soporte-it@setesagt.com`, configurable con `SOPORTE_CORREO`) en el pie de todas las pantallas, incluido el inicio de sesión, y en el mensaje de bloqueo.
+- [x] **Cambio de contraseña**: «🔑 Mi contraseña» para todos los roles. IT asigna una contraseña **temporal** (al crear la cuenta o al restablecerla) y el usuario **debe cambiarla** al iniciar sesión antes de usar el sistema. Los fallos al verificar la contraseña actual cuentan para el bloqueo; queda auditado (`CAMBIO_PASSWORD`).
+- [x] Solo IT restablece contraseñas y desbloquea accesos.
+- [x] Migración `scripts/migracion_fase24.py` y pruebas `tests/test_fase24.py` (26).
+
+**Para el despliegue:** la latencia que se nota hoy es de tu equipo hacia Oregón; si
+Render se crea en la región de Oregón (junto a Supabase, `us-west-2`) la distancia a
+la base de datos es de pocos milisegundos.
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
