@@ -39,6 +39,7 @@ def cur():
             "motivo_resolucion TEXT",
             "fecha_resolucion TIMESTAMP",
             "id_resuelve INTEGER",
+            "pdf_inmutable BOOLEAN NOT NULL DEFAULT FALSE",
         ):
             cursor.execute(
                 f"ALTER TABLE solicitud ADD COLUMN IF NOT EXISTS {columna}"
@@ -440,5 +441,38 @@ def test_resolucion_solo_al_finalizar(cur, actores):
     assert _rechaza(
         cur,
         "UPDATE solicitud SET resolucion = 'Denegada' WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fase 17: PDF final inmutable
+# ---------------------------------------------------------------------------
+def test_pdf_final_inmutable_no_cambia_ni_su_sello(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    _finalizar(cur, actores, id_sol)
+    assert not _rechaza(
+        cur,
+        "UPDATE solicitud SET ruta_pdf = 'pdf/x/final_a.pdf', pdf_hash = 'a', "
+        "pdf_inmutable = TRUE WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+    assert _rechaza(
+        cur,
+        "UPDATE solicitud SET pdf_hash = 'b' WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+    assert _rechaza(
+        cur,
+        "UPDATE solicitud SET ruta_pdf = 'pdf/x/otro.pdf' WHERE id_solicitud = %s",
+        (id_sol,),
+    )
+
+
+def test_borrador_no_puede_marcarse_inmutable(cur, actores):
+    id_sol = _solicitud_pendiente(cur, actores)
+    assert _rechaza(
+        cur,
+        "UPDATE solicitud SET pdf_inmutable = TRUE WHERE id_solicitud = %s",
         (id_sol,),
     )

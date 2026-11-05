@@ -526,6 +526,32 @@ def actualizar_ruta_pdf(id_solicitud, ruta_pdf):
         conn.close()
 
 
+def registrar_pdf(id_solicitud, clave, pdf_hash, final=False):
+    """Guarda la clave del PDF en el repositorio y su sello (Fase 17).
+
+    Con ``final=True`` el PDF queda inmutable: los triggers impiden volver a
+    cambiar la clave, el sello o cualquier otro dato del expediente.
+    """
+    conn = get_connection()
+    if not conn:
+        raise RuntimeError("No hay conexión a la base de datos.")
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                cursor.execute(
+                    """
+                    UPDATE solicitud
+                    SET ruta_pdf = %s, pdf_hash = %s, pdf_hash_fecha = NOW(),
+                        pdf_inmutable = %s
+                    WHERE id_solicitud = %s
+                    """,
+                    (str(clave), pdf_hash, bool(final), id_solicitud),
+                )
+                return cursor.rowcount == 1
+    finally:
+        conn.close()
+
+
 def actualizar_hash_pdf(id_solicitud, pdf_hash):
     """Persiste el sello SHA-256 del PDF oficial (H-13)."""
     conn = get_connection()

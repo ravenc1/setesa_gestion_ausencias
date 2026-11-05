@@ -1,6 +1,5 @@
 # Trazabilidad, filtros y descargas del panel gerencial (RF-04 / HU-03).
 
-from pathlib import Path
 
 import pandas as pd
 import streamlit as st
@@ -144,7 +143,7 @@ def _mostrar_descargas(df_filtrado):
                 format_func=lambda valor: _etiqueta_solicitud(finalizadas, valor),
             )
             try:
-                ruta, contenido = preparar_pdf_descarga(id_pdf)
+                nombre_pdf, contenido = preparar_pdf_descarga(id_pdf)
             except Exception as e:
                 logger.exception("No se pudo preparar el PDF final %s", id_pdf)
                 st.error(f"No se pudo preparar el PDF final: {e}")
@@ -152,7 +151,7 @@ def _mostrar_descargas(df_filtrado):
                 st.download_button(
                     "📥 Descargar PDF final con firmas",
                     data=contenido,
-                    file_name=Path(ruta).name,
+                    file_name=nombre_pdf,
                     mime="application/pdf",
                     type="primary",
                 )
@@ -161,8 +160,8 @@ def _mostrar_descargas(df_filtrado):
                     st.success("🔐 Integridad verificada (SHA-256).")
                 elif integridad["estado"] == "alterado":
                     st.error(
-                        "⚠️ El PDF no coincide con el sello registrado. "
-                        "Regenere el documento antes de usarlo."
+                        "⚠️ El PDF no coincide con el sello registrado: el "
+                        "archivo fue alterado. No lo use y repórtelo a IT."
                     )
                 elif integridad["estado"] == "sin_sello":
                     st.warning(
@@ -170,7 +169,7 @@ def _mostrar_descargas(df_filtrado):
                         "regenere el documento para sellarlo."
                     )
                 else:
-                    st.info("El PDF aún no está disponible en disco.")
+                    st.info("El PDF aún no está disponible en el repositorio.")
 
                 with st.expander("Ver sello SHA-256"):
                     st.code(
@@ -431,7 +430,8 @@ def mostrar_dashboard():
                             "success",
                             f"El expediente #{id_seleccionado} fue "
                             f"{'denegado' if denegar else 'aprobado'} y "
-                            f"firmado. PDF actualizado en {ruta}.",
+                            f"firmado. PDF final guardado en el repositorio "
+                            f"({ruta}).",
                         )
                     except Exception as e:
                         st.session_state["flash_gerencia"] = (

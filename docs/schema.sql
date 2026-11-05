@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS solicitud (
     firma_gerencia   TEXT,
     pdf_hash         VARCHAR(64),
     pdf_hash_fecha   TIMESTAMP,
+    -- Fase 17: ruta_pdf es la clave en el repositorio (Supabase Storage);
+    -- pdf_inmutable = TRUE cuando ya se guardó el PDF final.
+    pdf_inmutable    BOOLEAN NOT NULL DEFAULT FALSE,
     -- Fase 16: resolución del expediente al finalizar (motivo cifrado).
     resolucion        VARCHAR(10),
     motivo_resolucion TEXT,

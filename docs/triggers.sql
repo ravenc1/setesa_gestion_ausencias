@@ -142,7 +142,7 @@ BEGIN
         RAISE EXCEPTION 'SETESA: toda solicitud debe registrarse en estado Ingresada.';
     END IF;
     IF NEW.firma_jefe_gtc IS NOT NULL OR NEW.firma_gerencia IS NOT NULL
-       OR NEW.resolucion IS NOT NULL THEN
+       OR NEW.resolucion IS NOT NULL OR NEW.pdf_inmutable THEN
         RAISE EXCEPTION 'SETESA: una solicitud nueva no puede traer firmas del banco, de Gerencia ni resolución.';
     END IF;
     IF NOT setesa_usuario_vigente(NEW.id_usuario) THEN
@@ -175,13 +175,22 @@ CREATE OR REPLACE FUNCTION setesa_trg_solicitud_update()
 RETURNS TRIGGER
 LANGUAGE plpgsql AS $$
 DECLARE
-    v_sello CONSTANT TEXT[] := ARRAY['ruta_pdf', 'pdf_hash', 'pdf_hash_fecha'];
+    v_sello CONSTANT TEXT[] :=
+        ARRAY['ruta_pdf', 'pdf_hash', 'pdf_hash_fecha', 'pdf_inmutable'];
 BEGIN
     IF setesa_borrado_permitido() THEN
         RETURN NEW;  -- limpieza de pruebas (p. ej. ON DELETE SET NULL)
     END IF;
 
-    -- a) Expediente cerrado.
+    -- a) Expediente cerrado. Fase 17: una vez guardado su PDF final
+    --    (pdf_inmutable), no cambia nada, ni siquiera el sello.
+    IF OLD.estado_workflow = 'Finalizada' AND OLD.pdf_inmutable THEN
+        IF to_jsonb(NEW) IS DISTINCT FROM to_jsonb(OLD) THEN
+            RAISE EXCEPTION 'SETESA: el expediente % y su PDF final son inalterables.',
+                OLD.id_solicitud;
+        END IF;
+        RETURN NEW;
+    END IF;
     IF OLD.estado_workflow = 'Finalizada' THEN
         IF (to_jsonb(NEW) - v_sello) IS DISTINCT FROM (to_jsonb(OLD) - v_sello) THEN
             RAISE EXCEPTION 'SETESA: el expediente % está Finalizado y no puede modificarse.',
@@ -234,6 +243,11 @@ BEGIN
                 END IF;
             END IF;
         END IF;
+    END IF;
+
+    -- Solo un expediente finalizado puede tener PDF final inmutable.
+    IF NEW.pdf_inmutable AND NEW.estado_workflow <> 'Finalizada' THEN
+        RAISE EXCEPTION 'SETESA: solo un expediente finalizado tiene PDF final.';
     END IF;
 
     -- La resolución solo se asigna al finalizar.

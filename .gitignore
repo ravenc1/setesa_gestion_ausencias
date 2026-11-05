@@ -14,6 +14,7 @@ __pycache__/
 storage/pdf/*
 storage/firmas/*
 storage/backups/
+storage/repositorio/
 !storage/pdf/.gitkeep
 !storage/firmas/.gitkeep
 temp_pdf/

@@ -15,5 +15,8 @@ if str(RAIZ) not in sys.path:
 
 load_dotenv(RAIZ / ".env")
 
+# Fase 17: las pruebas usan el repositorio local, nunca el bucket real.
+os.environ["SUPABASE_SERVICE_KEY"] = ""
+
 if not os.getenv("FERNET_KEY"):
     os.environ["FERNET_KEY"] = Fernet.generate_key().decode()

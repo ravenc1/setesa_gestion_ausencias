@@ -1,7 +1,8 @@
 # Pruebas de integración del servicio de documentos (requieren DATABASE_URL).
 #
 # Verifican que el PDF oficial se genere desde la base, incluya las firmas
-# capturadas, se guarde en `solicitud.ruta_pdf` y no deje temporales.
+# capturadas, se guarde en el repositorio (aquí, una carpeta temporal) y que
+# el PDF final quede inmutable (Fase 17).
 
 import base64
 import datetime
@@ -14,6 +15,7 @@ import pytest
 from PIL import Image
 
 from src.core.config import FIRMAS_DIR, PDF_DIR
+from src.services import almacenamiento
 from src.core.database import get_connection
 from src.core.solicitudes import (
     cambiar_estado,
@@ -26,6 +28,7 @@ from src.core.workflow import (
 )
 from src.services.documentos import (
     generar_pdf_solicitud,
+    preparar_pdf_descarga,
     verificar_integridad_pdf,
 )
 
@@ -33,6 +36,14 @@ pytestmark = pytest.mark.skipif(
     not os.getenv("DATABASE_URL"),
     reason="Requiere DATABASE_URL (pruebas de integración).",
 )
+
+
+@pytest.fixture(autouse=True)
+def repositorio(tmp_path, monkeypatch):
+    """Repositorio local temporal para cada prueba."""
+    monkeypatch.setattr(almacenamiento, "REPOSITORIO_DIR", tmp_path)
+    monkeypatch.setattr(almacenamiento, "configuracion_supabase", lambda: None)
+    return tmp_path
 
 
 def _firma_b64():
@@ -89,13 +100,6 @@ def _crear_solicitud(id_usuario, id_coordinador):
 
 
 def _limpiar(id_solicitud, ruta_pdf=None):
-    if ruta_pdf:
-        for archivo in (
-            Path(ruta_pdf),
-            Path(ruta_pdf).with_suffix(".pdf.sha256"),
-        ):
-            if archivo.exists():
-                archivo.unlink()
     conn = get_connection()
     if not conn:
         return
@@ -110,9 +114,8 @@ def _limpiar(id_solicitud, ruta_pdf=None):
         conn.close()
 
 
-def test_pdf_final_con_tres_firmas_y_ruta_persistida(ids):
+def test_pdf_final_con_tres_firmas_es_inmutable(ids, repositorio):
     id_solicitud = _crear_solicitud(ids["Consultor"], ids["Coordinador GTC"])
-    ruta = None
     try:
         cambiar_estado(
             id_solicitud,
@@ -130,63 +133,70 @@ def test_pdf_final_con_tres_firmas_y_ruta_persistida(ids):
         )
 
         antes = set(FIRMAS_DIR.glob("temp_firma_*.png"))
-        ruta = generar_pdf_solicitud(id_solicitud)
+        clave = generar_pdf_solicitud(id_solicitud)
         despues = set(FIRMAS_DIR.glob("temp_firma_*.png"))
 
-        assert Path(ruta).exists()
-        assert Path(ruta).parent == PDF_DIR
-        assert f"accion_{id_solicitud}_" in Path(ruta).name
-
+        assert clave.startswith(f"pdf/{id_solicitud}/final_")
         datos = obtener_solicitud(id_solicitud)
-        assert datos["ruta_pdf"] == ruta
+        assert datos["ruta_pdf"] == clave
+        assert datos["pdf_inmutable"] is True
 
-        contenido = Path(ruta).read_bytes()
+        contenido = almacenamiento.leer(clave)
         assert contenido.count(b"/Subtype /Image") == 3, (
             "El PDF final debe estampar las tres firmas"
         )
         assert despues - antes == set(), "No deben quedar imágenes temporales"
+        assert not list(PDF_DIR.glob(f"accion_{id_solicitud}_*.pdf")), (
+            "El PDF no debe quedar en el disco efímero del servidor"
+        )
+
+        # El PDF final no se regenera: misma clave y mismo sello.
+        sello = datos["pdf_hash"]
+        assert generar_pdf_solicitud(id_solicitud) == clave
+        nombre, descargado = preparar_pdf_descarga(id_solicitud, regenerar=True)
+        assert descargado == contenido
+        assert nombre.endswith("_final.pdf")
+        assert obtener_solicitud(id_solicitud)["pdf_hash"] == sello
     finally:
-        _limpiar(id_solicitud, ruta)
+        _limpiar(id_solicitud)
 
 
-def test_pdf_sin_aprobaciones_solo_estampa_consultor(ids):
+def test_borrador_solo_estampa_consultor_y_se_regenera(ids):
     id_solicitud = _crear_solicitud(ids["Consultor"], ids["Coordinador GTC"])
-    ruta = None
     try:
-        ruta = generar_pdf_solicitud(id_solicitud)
-        contenido = Path(ruta).read_bytes()
-        assert contenido.count(b"/Subtype /Image") == 1
+        clave = generar_pdf_solicitud(id_solicitud)
+        assert clave == f"pdf/{id_solicitud}/borrador.pdf"
+        assert almacenamiento.leer(clave).count(b"/Subtype /Image") == 1
+        assert obtener_solicitud(id_solicitud)["pdf_inmutable"] is False
 
-        # Regenerar el mismo expediente reutiliza la ruta (no acumula PDFs).
-        assert generar_pdf_solicitud(id_solicitud) == ruta
+        # Regenerar el borrador reutiliza la clave (no acumula PDFs).
+        assert generar_pdf_solicitud(id_solicitud) == clave
     finally:
-        _limpiar(id_solicitud, ruta)
+        _limpiar(id_solicitud)
 
 
-def test_pdf_se_sella_y_detecta_alteracion(ids):
+def test_pdf_se_sella_y_detecta_alteracion(ids, repositorio):
     id_solicitud = _crear_solicitud(ids["Consultor"], ids["Coordinador GTC"])
-    ruta = None
     try:
-        ruta = generar_pdf_solicitud(id_solicitud)
+        clave = generar_pdf_solicitud(id_solicitud)
 
         datos = obtener_solicitud(id_solicitud)
         assert datos["pdf_hash"] and len(datos["pdf_hash"]) == 64
         assert datos["pdf_hash_fecha"] is not None
-        assert Path(ruta).with_suffix(".pdf.sha256").exists()
 
         integridad = verificar_integridad_pdf(id_solicitud)
         assert integridad["estado"] == "ok"
         assert integridad["sello_esperado"] == integridad["sello_actual"]
 
         # Cualquier cambio en el archivo invalida el sello registrado.
-        with open(ruta, "ab") as archivo:
+        with open(repositorio / clave, "ab") as archivo:
             archivo.write(b"\n% alterado por la prueba\n")
 
         integridad = verificar_integridad_pdf(id_solicitud)
         assert integridad["estado"] == "alterado"
         assert integridad["sello_esperado"] != integridad["sello_actual"]
     finally:
-        _limpiar(id_solicitud, ruta)
+        _limpiar(id_solicitud)
 
 
 def test_datos_sensibles_se_guardan_cifrados(ids):
