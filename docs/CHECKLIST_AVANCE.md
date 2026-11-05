@@ -582,6 +582,21 @@ expedientes del otro. ✅ **Cumplido.**
 
 ---
 
+### Fase 12 — Reasignación de Coordinador GTC por Gerencia
+
+- [x] **Pestaña** «Reasignar Coordinador» en el panel de Gerencia.
+- [x] Lista los expedientes que esperan el visto bueno del banco y resalta los de coordinadores dados de baja.
+- [x] **Reasignación** solo a un Coordinador GTC vigente, con motivo obligatorio; el estado no cambia.
+- [x] **Historial**: el movimiento queda en `solicitud_historial` con el coordinador anterior, el nuevo y el motivo.
+- [x] **Recordatorios (R-11)** sin atender pasan al nuevo coordinador.
+- [x] **Aviso a IT**: al dar de baja a un coordinador con expedientes pendientes se indica que Gerencia debe reasignarlos.
+- [x] Pruebas `tests/test_reasignacion.py` (4 unitarias y 1 de integración). Sin cambios de esquema.
+
+**Criterio de aceptación:** un expediente del coordinador A pasa a la bandeja
+del coordinador B; A ya no puede firmarlo y B sí. ✅ **Cumplido.**
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
