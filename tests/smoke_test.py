@@ -225,6 +225,7 @@ def test_workflow_end_to_end(conn):
     finally:
         if id_solicitud:
             cursor = conn.cursor()
+            cursor.execute("SET LOCAL setesa.permitir_borrado = 'on'")
             cursor.execute(
                 "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
             )
@@ -389,6 +390,7 @@ def test_consultor_flujo():
     finally:
         cursor = conn.cursor()
         if id_solicitud:
+            cursor.execute("SET LOCAL setesa.permitir_borrado = 'on'")
             cursor.execute(
                 "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
             )
@@ -470,6 +472,7 @@ def test_dashboard_gerencia():
         _limpiar_pdf(ruta_pdf)
         if id_solicitud:
             cursor = conn.cursor()
+            cursor.execute("SET LOCAL setesa.permitir_borrado = 'on'")
             cursor.execute(
                 "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
             )
@@ -608,6 +611,7 @@ def test_vacaciones_feriados():
                 pass
         cursor = conn.cursor()
         if id_solicitud:
+            cursor.execute("SET LOCAL setesa.permitir_borrado = 'on'")
             cursor.execute(
                 "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
             )

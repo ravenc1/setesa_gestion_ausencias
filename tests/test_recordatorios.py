@@ -96,6 +96,7 @@ def _eliminar(id_solicitud):
         return
     try:
         with conn.cursor() as cursor:
+            cursor.execute("SET LOCAL setesa.permitir_borrado = 'on'")
             cursor.execute(
                 "DELETE FROM solicitud WHERE id_solicitud = %s", (id_solicitud,)
             )
