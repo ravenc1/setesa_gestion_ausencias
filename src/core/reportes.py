@@ -90,6 +90,7 @@ def calcular_kpis(df):
         "finalizadas": 0,
         "aprobadas": 0,
         "denegadas": 0,
+        "retiradas": 0,
     }
     if df is None or df.empty:
         return vacio

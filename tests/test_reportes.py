@@ -145,6 +145,7 @@ def test_dataframe_vacio():
         "finalizadas": 0,
         "aprobadas": 0,
         "denegadas": 0,
+        "retiradas": 0,
     }
     assert list(resumen_por_tipo(None).columns) == ["tipo_ausencia", "cantidad"]
 
@@ -158,6 +159,7 @@ def test_calcular_kpis(solicitudes):
         "finalizadas": 2,
         "aprobadas": 2,
         "denegadas": 0,
+        "retiradas": 0,
     }
 
 
