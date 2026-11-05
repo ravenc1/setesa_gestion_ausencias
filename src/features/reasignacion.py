@@ -12,8 +12,8 @@ from src.core.usuarios import listar_coordinadores
 
 
 def mostrar_panel_reasignacion():
-    if not rol_autorizado(["Administrador"]):
-        st.error("Acceso denegado: esta sección es exclusiva de Gerencia.")
+    if not rol_autorizado(["Administrador", "IT"]):
+        st.error("Acceso denegado: esta sección es exclusiva de Gerencia e IT.")
         return
 
     st.markdown("### 🔁 Reasignar Coordinador GTC")
@@ -21,7 +21,10 @@ def mostrar_panel_reasignacion():
     if flash:
         st.success(flash)
     st.info(
-        "Si un Coordinador GTC se da de baja o no puede atender, sus "
+        "Si un Coordinador GTC deja de estar asignado en el banco, IT lo da "
+        "de baja y reasigna aquí sus expedientes. Si llega un coordinador "
+        "nuevo, IT primero lo registra en «Crear usuario». Si un Coordinador "
+        "GTC se da de baja o no puede atender, sus "
         "expedientes pendientes de visto bueno pueden pasar a otro "
         "coordinador vigente. El cambio queda en el historial del expediente."
     )

@@ -37,6 +37,11 @@ CREATE TABLE IF NOT EXISTS usuario (
     estado_vigencia      BOOLEAN DEFAULT TRUE,
     ultima_actividad     TIMESTAMP NOT NULL,
     dias_vacaciones_asignados INTEGER NOT NULL DEFAULT 15,
+    -- Fase 14: "Mis datos" (actualización cada 6 meses; teléfono cifrado).
+    puesto               VARCHAR(150),
+    codigo_empleado      VARCHAR(50),
+    telefono             TEXT,
+    fecha_actualizacion_datos TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT usuario_dias_vacaciones_check CHECK (
         dias_vacaciones_asignados >= 0
     )
@@ -134,7 +139,8 @@ CREATE TABLE IF NOT EXISTS usuario_log (
     accion      VARCHAR(20) NOT NULL,
     detalle     TEXT,
     CONSTRAINT usuario_log_accion_check CHECK (
-        accion IN ('CREACION', 'EDICION', 'BAJA', 'REACTIVACION', 'RESET_PASSWORD')
+        accion IN ('CREACION', 'EDICION', 'BAJA', 'REACTIVACION', 'RESET_PASSWORD',
+                   'ACTUALIZACION_DATOS')
     )
 );
 

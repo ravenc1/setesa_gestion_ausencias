@@ -1,8 +1,9 @@
 # Fase 12: Gerencia reasigna expedientes a otro Coordinador GTC.
 #
 # Si un coordinador se da de baja (o deja de atender), sus expedientes que
-# esperan el visto bueno del banco quedarían sin quien los firme. Gerencia
-# puede moverlos a otro Coordinador GTC vigente. El estado no cambia: el
+# esperan el visto bueno del banco quedarían sin quien los firme. IT (que da de
+# baja al coordinador saliente) o Gerencia los mueven a otro Coordinador GTC
+# vigente. El estado no cambia: el
 # movimiento queda en solicitud_historial con el motivo, y los recordatorios
 # pendientes pasan al nuevo coordinador.
 

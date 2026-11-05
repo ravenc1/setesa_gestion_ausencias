@@ -18,7 +18,10 @@ from src.core.gestion_usuarios import (
     listar_usuarios,
     resetear_password,
 )
+from src.core.recordatorios import construir_enlace_correo
 from src.core.reasignacion import contar_pendientes_coordinador
+from src.core.vigencia import DIAS_AVISO, obtener_por_vencer
+from src.features.reasignacion import mostrar_panel_reasignacion
 from src.core.security import ROL_IT, rol_autorizado
 
 COLUMNAS_USUARIOS = {
@@ -28,6 +31,7 @@ COLUMNAS_USUARIOS = {
     "nombre_rol": "Rol",
     "estado_vigencia": "Activo",
     "ultima_actividad": "Última actividad",
+    "fecha_limite_datos": "Actualizar datos antes de",
     "dias_vacaciones_asignados": "Días asignados",
     "dias_usados": "Días usados",
     "dias_disponibles": "Días disponibles",
@@ -161,8 +165,8 @@ def _acciones_acceso(fila):
                         if pendientes:
                             aviso += (
                                 f" Tenía {pendientes} expediente(s) esperando "
-                                "su visto bueno: Gerencia debe reasignarlos "
-                                "en la pestaña «Reasignar Coordinador»."
+                                "su visto bueno: reasígnelos en la pestaña "
+                                "«Reasignar Coordinador»."
                             )
                     _flash("warning", aviso)
                     st.rerun()
@@ -301,6 +305,30 @@ def _tab_auditoria():
     )
 
 
+def _tab_por_vencer():
+    """Usuarios que deben actualizar sus datos en los próximos 30 días."""
+    st.markdown(f"#### ⏳ Actualización de datos por vencer ({DIAS_AVISO} días)")
+    st.caption(
+        "Consultor y Contabilidad y RR.HH. deben actualizar sus datos cada "
+        "6 meses en «Mis datos»; si no lo hacen, pasan a baja lógica."
+    )
+    df = obtener_por_vencer()
+    if df.empty:
+        st.info("Ningún usuario tiene su plazo por vencer.")
+        return
+    st.dataframe(df, hide_index=True, width="stretch")
+    for fila in df.itertuples():
+        enlace = construir_enlace_correo(
+            fila.correo_institucional,
+            "SETESA: actualice sus datos en el sistema de ausencias",
+            f"Estimado(a) {fila.nombre_completo}: su plazo para actualizar "
+            f"sus datos vence el {fila.fecha_limite:%d/%m/%Y}. Ingrese al "
+            "sistema, abra «Mis datos» y confirme su información para "
+            "mantener su cuenta activa.",
+        )
+        st.markdown(f"- [✉️ Recordar a {fila.nombre_completo}]({enlace})")
+
+
 def mostrar_panel_usuarios():
     if not rol_autorizado([ROL_IT]):
         st.error("Acceso denegado: esta sección es exclusiva del rol IT.")
@@ -319,12 +347,23 @@ def mostrar_panel_usuarios():
         return
 
     df = listar_usuarios()
-    tab_usuarios, tab_crear, tab_auditoria = st.tabs(
-        ["👥 Usuarios", "➕ Crear usuario", "🧾 Auditoría"]
+    tab_usuarios, tab_crear, tab_reasignar, tab_vencer, tab_auditoria = st.tabs(
+        [
+            "👥 Usuarios",
+            "➕ Crear usuario",
+            "🔁 Reasignar Coordinador",
+            "⏳ Por vencer",
+            "🧾 Auditoría",
+        ]
     )
     with tab_usuarios:
         _tab_usuarios(df, roles)
     with tab_crear:
         _tab_crear(roles)
+    with tab_reasignar:
+        # IT da de baja al coordinador saliente y reasigna sus expedientes.
+        mostrar_panel_reasignacion()
+    with tab_vencer:
+        _tab_por_vencer()
     with tab_auditoria:
         _tab_auditoria()

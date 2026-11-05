@@ -20,6 +20,7 @@ CAMPOS_SENSIBLES = (
     "firma_empleado",
     "firma_jefe_gtc",
     "firma_gerencia",
+    "telefono",
 )
 
 

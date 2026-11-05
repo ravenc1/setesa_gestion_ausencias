@@ -11,6 +11,7 @@ from src.services.documentos import generar_pdf_solicitud
 from src.core.security import rol_autorizado
 from src.core.catalogos import OPCIONES_AUSENCIA
 from src.core.feriados import fechas_feriados
+from src.core.perfil import obtener_perfil
 from src.core.usuarios import listar_coordinadores
 from src.core.utils import calcular_dias_habiles
 from src.core.vacaciones import TIPO_VACACION, obtener_saldo_vacaciones
@@ -114,6 +115,11 @@ def mostrar_formulario():
                 st.rerun()
         else:
             st.info("Complete el formulario. Al firmar electrónicamente, la solicitud se enviará al Coordinador GTC para su visto bueno.")
+            # Fase 14: puesto y código salen de «Mis datos» (editables aquí).
+            try:
+                perfil = obtener_perfil(st.session_state["id_usuario"]) or {}
+            except Exception:
+                perfil = {}
             col1, col2 = st.columns(2)
             with col1:
                 # El expediente se asigna al coordinador por su id de usuario:
@@ -138,10 +144,10 @@ def mostrar_formulario():
                         "de enviar la solicitud."
                     )
                     id_coordinador = None
-                puesto = st.text_input("PUESTO:")
+                puesto = st.text_input("PUESTO:", perfil.get("puesto", ""))
                 fecha_inicio = st.date_input("Fecha de Inicio (Del:)", min_value=datetime.date.today())
             with col2:
-                codigo = st.text_input("CÓDIGO:")
+                codigo = st.text_input("CÓDIGO:", perfil.get("codigo_empleado", ""))
                 tipo_ausencia = st.selectbox("NATURALEZA DE LA ACCIÓN:", OPCIONES_AUSENCIA)
                 fecha_fin = st.date_input(
                     "Fecha de Fin (Al:)",

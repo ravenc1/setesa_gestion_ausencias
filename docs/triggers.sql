@@ -2,7 +2,8 @@
 -- SETESA Workflow - Triggers de PostgreSQL (Fase 13)
 --
 -- Tesis, sección 3.6: los triggers validan automáticamente la vigencia de los
--- usuarios, "independientemente de si el administrador olvida realizar la
+-- usuarios (Fase 14: la vigencia se mide por la "actualización de datos cada
+-- 6 meses" de la sección 1.5 y el objetivo c), "independientemente de si el administrador olvida realizar la
 -- revisión manual". Resultados QA: "los Triggers en PostgreSQL evitan
 -- registros huérfanos, garantizando la integridad de los datos".
 --
@@ -38,15 +39,24 @@ LANGUAGE sql STABLE AS $$
      WHERE u.id_usuario = p_id_usuario
 $$;
 
--- RF-05: vigente = activo y con actividad en los últimos 6 meses. Los roles
--- protegidos (Administrador, IT) nunca vencen por inactividad.
+-- Roles que deben actualizar sus datos cada 6 meses (módulo "Mis datos").
+-- Coordinador GTC, Administrador e IT no vencen: IT los da de baja a mano.
+CREATE OR REPLACE FUNCTION setesa_requiere_actualizacion(p_rol VARCHAR)
+RETURNS BOOLEAN
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT COALESCE(p_rol IN ('Consultor', 'Contabilidad'), FALSE)
+$$;
+
+-- RF-05: vigente = activo y, si su rol lo exige, con sus datos actualizados
+-- en los últimos 6 meses.
 CREATE OR REPLACE FUNCTION setesa_usuario_vigente(p_id_usuario INTEGER)
 RETURNS BOOLEAN
 LANGUAGE sql STABLE AS $$
     SELECT COALESCE((
         SELECT u.estado_vigencia
-               AND (r.nombre_rol IN ('Administrador', 'IT')
-                    OR u.ultima_actividad >= CURRENT_DATE - INTERVAL '6 months')
+               AND (NOT setesa_requiere_actualizacion(r.nombre_rol)
+                    OR u.fecha_actualizacion_datos
+                       >= CURRENT_DATE - INTERVAL '6 months')
           FROM usuario u
           JOIN rol r ON u.id_rol = r.id_rol
          WHERE u.id_usuario = p_id_usuario
@@ -56,9 +66,10 @@ $$;
 
 -- -----------------------------------------------------------------------------
 -- 1. Vigencia automática (sección 3.6)
---    Si un usuario activo lleva más de 6 meses sin actividad y el sistema
---    intenta registrarle actividad nueva (login, firma, registro), el trigger
---    aplica la baja lógica en lugar de "revivirlo" y lo deja auditado.
+--    Si un Consultor o Contabilidad lleva más de 6 meses sin actualizar sus
+--    datos y el sistema intenta registrarle actividad o actualización (login,
+--    firma, registro, "Mis datos"), el trigger aplica la baja lógica en lugar
+--    de "revivirlo" y lo deja auditado.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION setesa_trg_usuario_vigencia()
 RETURNS TRIGGER
@@ -66,15 +77,16 @@ LANGUAGE plpgsql AS $$
 BEGIN
     IF OLD.estado_vigencia
        AND NEW.estado_vigencia
-       AND NEW.ultima_actividad > OLD.ultima_actividad
-       AND OLD.ultima_actividad < CURRENT_DATE - INTERVAL '6 months'
-       AND setesa_rol_usuario(OLD.id_usuario) NOT IN ('Administrador', 'IT')
+       AND OLD.fecha_actualizacion_datos < CURRENT_DATE - INTERVAL '6 months'
+       AND setesa_requiere_actualizacion(setesa_rol_usuario(OLD.id_usuario))
     THEN
         NEW.estado_vigencia := FALSE;
         NEW.ultima_actividad := OLD.ultima_actividad;
+        NEW.fecha_actualizacion_datos := OLD.fecha_actualizacion_datos;
         INSERT INTO vigencia_log (id_ejecutor, accion, usuarios_afectados, detalle)
         VALUES (NULL, 'AUTOMATICA', 1,
-                'trigger: id=' || OLD.id_usuario || ' (más de 6 meses sin actividad)');
+                'trigger: id=' || OLD.id_usuario
+                || ' (más de 6 meses sin actualizar sus datos)');
     END IF;
     RETURN NEW;
 END;
@@ -82,7 +94,7 @@ $$;
 
 DROP TRIGGER IF EXISTS trg_usuario_vigencia ON usuario;
 CREATE TRIGGER trg_usuario_vigencia
-    BEFORE UPDATE OF ultima_actividad ON usuario
+    BEFORE UPDATE OF ultima_actividad, fecha_actualizacion_datos ON usuario
     FOR EACH ROW EXECUTE FUNCTION setesa_trg_usuario_vigencia();
 
 
@@ -100,8 +112,8 @@ BEGIN
           FROM rol r
          WHERE u.id_rol = r.id_rol
            AND u.estado_vigencia = TRUE
-           AND u.ultima_actividad < CURRENT_DATE - INTERVAL '6 months'
-           AND r.nombre_rol NOT IN ('Administrador', 'IT')
+           AND u.fecha_actualizacion_datos < CURRENT_DATE - INTERVAL '6 months'
+           AND setesa_requiere_actualizacion(r.nombre_rol)
         RETURNING u.id_usuario
     )
     SELECT array_agg(id_usuario ORDER BY id_usuario) INTO v_ids FROM bajas;
@@ -315,8 +327,8 @@ BEGIN
         END IF;
     ELSIF NEW.estado_anterior = 'Pendiente de Firma Coordinador'
           AND NEW.estado_nuevo = 'Pendiente de Firma Coordinador' THEN
-        IF v_rol <> 'Administrador' THEN
-            RAISE EXCEPTION 'SETESA: solo Gerencia reasigna expedientes.';
+        IF v_rol NOT IN ('Administrador', 'IT') THEN
+            RAISE EXCEPTION 'SETESA: solo Gerencia o IT reasignan expedientes.';
         END IF;
     ELSIF NEW.estado_nuevo = 'Pendiente de Aprobación Gerencia' THEN
         IF NEW.id_usuario IS DISTINCT FROM v_coordinador THEN

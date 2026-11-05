@@ -6,12 +6,14 @@ import streamlit as st
 
 from src.core.security import rol_autorizado
 from src.core.vigencia import (
-    ROLES_PROTEGIDOS,
+    DIAS_AVISO,
+    ROLES_CON_ACTUALIZACION,
     UsuarioNoEncontrado,
     ejecutar_depuracion,
     obtener_dados_de_baja,
     obtener_historial_vigencia,
     obtener_inactivos,
+    obtener_por_vencer,
     reactivar_usuario,
 )
 
@@ -33,20 +35,29 @@ def mostrar_panel_vigencia():
     if flash:
         getattr(st, flash[0])(flash[1])
     st.info(
-        "El algoritmo aplica baja lógica a los usuarios con más de 6 meses sin "
-        "actividad, sin borrar su historial. Los roles administrativos "
-        f"({', '.join(ROLES_PROTEGIDOS)}) están protegidos y nunca se "
-        "desactivan automáticamente."
+        "El algoritmo aplica baja lógica, sin borrar el historial, a los "
+        f"usuarios con rol {' y '.join(ROLES_CON_ACTUALIZACION)} que llevan más "
+        "de 6 meses sin actualizar sus datos en «Mis datos». Coordinador GTC, "
+        "Administrador e IT no vencen automáticamente: IT los da de baja "
+        "manualmente. La base de datos también lo aplica a diario (pg_cron)."
     )
 
     id_ejecutor = st.session_state.get("id_usuario")
+
+    # 0. Próximos a vencer (aviso de 30 días)
+    st.markdown(f"#### ⏳ Por vencer en los próximos {DIAS_AVISO} días")
+    _mostrar_tabla(
+        obtener_por_vencer(),
+        "Ningún usuario tiene su actualización de datos por vencer.",
+    )
+    st.write("---")
 
     # 1. Candidatos a baja (vista previa, no modifica nada)
     st.markdown("#### 🔎 Candidatos a baja lógica")
     df_candidatos = obtener_inactivos(id_excluido=id_ejecutor)
     _mostrar_tabla(
         df_candidatos,
-        "No hay usuarios activos con más de 6 meses de inactividad.",
+        "No hay usuarios con más de 6 meses sin actualizar sus datos.",
     )
 
     # 2. Ejecución manual
@@ -67,7 +78,7 @@ def mostrar_panel_vigencia():
             if df_afectados.empty:
                 st.info(
                     "Escaneo completado. No se encontraron usuarios con más de "
-                    "6 meses de inactividad."
+                    "6 meses sin actualizar sus datos."
                 )
             else:
                 st.success(
