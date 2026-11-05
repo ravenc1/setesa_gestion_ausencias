@@ -672,6 +672,22 @@ queda finalizada con su motivo y devuelve los días al saldo. ✅ **Cumplido.**
 
 ---
 
+### Fase 17 — Repositorio persistente de expedientes · tesis objetivo d
+
+- [x] **Supabase Storage** (bucket privado `expedientes`) como repositorio de los PDF; Render no conserva archivos entre reinicios. Sin configuración se usa `storage/repositorio/` (desarrollo y pruebas).
+- [x] **Borrador** (`pdf/<id>/borrador.pdf`) regenerable mientras el expediente está en trámite.
+- [x] **PDF final** (`pdf/<id>/final_<sello>.pdf`) generado una sola vez al resolver el expediente; no se sobrescribe ni se regenera, así su SHA-256 no cambia.
+- [x] **Trigger**: con `pdf_inmutable = TRUE` el expediente y su PDF son inalterables; un borrador no puede marcarse como final.
+- [x] **Descargas** desde el repositorio (consultor, Gerencia y Contabilidad); verificación de integridad contra el sello.
+- [x] El PDF temporal se borra del disco del servidor tras subirse.
+- [x] Migración `scripts/migracion_fase17.py` (crea el bucket y sube los PDF locales existentes) y pruebas `tests/test_almacenamiento.py` (10), `tests/test_documentos.py` y `tests/test_triggers.py` (29).
+
+**Criterio de aceptación:** un PDF final sigue disponible e idéntico (mismo
+sello) después de reiniciar el servidor. ✅ **Cumplido** (pendiente de cargar
+la llave de Supabase).
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
