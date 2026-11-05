@@ -238,3 +238,8 @@ INSERT INTO feriado (fecha, nombre) VALUES
 ON CONFLICT (fecha) DO NOTHING;
 
 COMMIT;
+
+-- ---------------------------------------------------------------------------
+-- Fase 13: las reglas de integridad y vigencia en el motor de datos están en
+-- docs/triggers.sql (se aplican con scripts/migracion_fase13.py).
+-- ---------------------------------------------------------------------------

@@ -42,6 +42,13 @@ def login_user(email, password):
             # Un usuario dado de baja no debe "revivir" por intentar entrar.
             if estado_vigencia:
                 marcar_actividad(cursor, id_usuario)
+                # Fase 13: si llevaba más de 6 meses sin actividad, el trigger
+                # trg_usuario_vigencia acaba de aplicarle la baja lógica.
+                cursor.execute(
+                    "SELECT estado_vigencia FROM usuario WHERE id_usuario = %s",
+                    (id_usuario,),
+                )
+                estado_vigencia = cursor.fetchone()[0]
             conn.commit()
 
         cursor.close()
