@@ -73,6 +73,7 @@ def consultor():
     try:
         with conn:
             with conn.cursor() as cursor:
+                cursor.execute("SET LOCAL setesa.permitir_borrado = 'on'")
                 cursor.execute(
                     "DELETE FROM solicitud WHERE id_usuario = %s", (id_usuario,)
                 )
