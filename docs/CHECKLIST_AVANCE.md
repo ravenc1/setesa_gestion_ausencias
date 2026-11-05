@@ -736,6 +736,22 @@ interactúa; una pestaña abandonada se cierra en su siguiente clic.
 
 ---
 
+### Fase 21 — Indicadores del dashboard y catálogo de motivos · tesis (variables) y 6.4.4
+
+- [x] **Tiempo promedio de aprobación** (de la solicitud a su resolución), por etapa (banco y Gerencia) y por resolución (aprobadas y denegadas).
+- [x] **Usuarios vigentes e inactivos**, porcentaje de inactivos y usuarios por vencer en 30 días; visibles para Gerencia y Contabilidad y RR.HH.
+- [x] **Catálogo de motivos mantenible** (`motivo_ausencia`), con Gerencia como responsable: agrega motivos y activa o desactiva; los 22 de la plantilla oficial no se renombran ni se eliminan.
+- [x] **VACACION** y **SUSPENSIÓN IGSS** tienen regla propia y no se desactivan.
+- [x] **Lista cerrada** también en la base: un trigger rechaza motivos que no estén en el catálogo o estén desactivados; las solicitudes anteriores los conservan.
+- [x] Un motivo nuevo no tiene casilla en la hoja oficial: el PDF marca «OTROS» y escribe su nombre.
+- [x] El formulario de ausencia lee los motivos activos del catálogo (con la lista de la plantilla como respaldo).
+- [x] Migración `scripts/migracion_fase21.py` (siembra los 22 motivos) y pruebas `tests/test_fase21.py` (25) y `tests/test_triggers.py` (42).
+
+**Criterio de aceptación:** Gerencia agrega un motivo y aparece en el
+formulario; el dashboard muestra tiempos promedio y usuarios inactivos. ✅ **Cumplido.**
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
