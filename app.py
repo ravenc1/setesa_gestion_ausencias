@@ -26,6 +26,17 @@ if 'logged_in' not in st.session_state:
 if not st.session_state['logged_in']:
     auth.show_login()
 else:
+    # Fase 20: la sesión expira por inactividad o por duración máxima.
+    from src.core import sesion
+
+    motivo_expiracion = sesion.motivo_expiracion(st.session_state)
+    if motivo_expiracion:
+        st.session_state.clear()
+        st.warning(sesion.mensaje_expiracion(motivo_expiracion))
+        auth.show_login()
+        st.stop()
+    sesion.registrar_interaccion(st.session_state)
+
     # A-06: revalidar la vigencia en cada rerun para que una baja lógica
     # aplicada por Gerencia expulse también a las sesiones abiertas.
     from src.core.vigencia import usuario_activo

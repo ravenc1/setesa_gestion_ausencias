@@ -17,6 +17,7 @@ import re
 
 import pandas as pd
 
+from src.core import intentos
 from src.core.database import get_connection, get_engine
 from src.core.logging_config import obtener_logger
 from src.core.security import ROL_IT, hash_password
@@ -29,6 +30,7 @@ ACCION_EDICION = "EDICION"
 ACCION_BAJA = "BAJA"
 ACCION_REACTIVACION = "REACTIVACION"
 ACCION_RESET_PASSWORD = "RESET_PASSWORD"
+ACCION_DESBLOQUEO = "DESBLOQUEO"
 
 DIAS_VACACIONES_MAX = 365
 PASSWORD_MIN = 8
@@ -481,6 +483,12 @@ def resetear_password(id_ejecutor, id_usuario, password):
                     "UPDATE usuario SET password_hash = %s WHERE id_usuario = %s",
                     (hash_password(clave), id_usuario),
                 )
+                # Fase 20: una contraseña nueva también levanta el bloqueo.
+                cursor.execute(
+                    "SELECT correo_institucional FROM usuario WHERE id_usuario = %s",
+                    (id_usuario,),
+                )
+                intentos.limpiar(cursor, cursor.fetchone()[0])
                 _auditar(
                     cursor,
                     id_ejecutor,
@@ -493,6 +501,53 @@ def resetear_password(id_ejecutor, id_usuario, password):
             id_usuario,
             id_ejecutor,
         )
+    finally:
+        conn.close()
+
+
+def listar_bloqueos():
+    """Correos con el acceso bloqueado en este momento (Fase 20)."""
+    engine = get_engine()
+    if engine is None:
+        return pd.DataFrame()
+    return pd.read_sql_query(
+        """
+        SELECT i.correo, i.intentos, i.ultimo_intento, i.bloqueado_hasta,
+               u.id_usuario, u.nombre_completo
+        FROM intento_login i
+        LEFT JOIN usuario u ON LOWER(u.correo_institucional) = i.correo
+        WHERE i.bloqueado_hasta > NOW()
+        ORDER BY i.bloqueado_hasta DESC
+        """,
+        engine,
+    )
+
+
+def desbloquear_acceso(id_ejecutor, correo):
+    """IT levanta el bloqueo por intentos fallidos de un correo."""
+    conn = get_connection()
+    if not conn:
+        raise GestionUsuariosError("No hay conexión a la base de datos.")
+    try:
+        with conn:
+            with conn.cursor() as cursor:
+                _validar_ejecutor(cursor, id_ejecutor)
+                if not intentos.limpiar(cursor, correo):
+                    raise GestionUsuariosError("Ese correo no tiene bloqueo.")
+                cursor.execute(
+                    "SELECT id_usuario FROM usuario "
+                    "WHERE LOWER(correo_institucional) = %s",
+                    (intentos.normalizar(correo),),
+                )
+                fila = cursor.fetchone()
+                _auditar(
+                    cursor,
+                    id_ejecutor,
+                    fila[0] if fila else None,
+                    ACCION_DESBLOQUEO,
+                    "Bloqueo por intentos fallidos levantado por IT",
+                )
+        logger.info("Acceso de %s desbloqueado por %s", correo, id_ejecutor)
     finally:
         conn.close()
 
