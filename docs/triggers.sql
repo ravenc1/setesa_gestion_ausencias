@@ -149,6 +149,14 @@ BEGIN
         RAISE EXCEPTION 'SETESA: el usuario % no está vigente y no puede registrar solicitudes.',
             NEW.id_usuario;
     END IF;
+    -- Fase 21: lista cerrada de motivos (catálogo mantenible).
+    IF NOT EXISTS (
+        SELECT 1 FROM motivo_ausencia
+         WHERE nombre = NEW.tipo_ausencia AND activo
+    ) THEN
+        RAISE EXCEPTION 'SETESA: el motivo "%" no está en el catálogo o está desactivado.',
+            NEW.tipo_ausencia;
+    END IF;
     IF NEW.id_coordinador IS NULL
        OR setesa_rol_usuario(NEW.id_coordinador) IS DISTINCT FROM 'Coordinador GTC'
        OR NOT setesa_usuario_vigente(NEW.id_coordinador)
@@ -552,3 +560,52 @@ DROP TRIGGER IF EXISTS trg_notificacion_update ON notificacion;
 CREATE TRIGGER trg_notificacion_update
     BEFORE UPDATE ON notificacion
     FOR EACH ROW EXECUTE FUNCTION setesa_trg_notificacion_update();
+
+
+-- -----------------------------------------------------------------------------
+-- 7. Catálogo de motivos de ausencia (Fase 21)
+--    El nombre no cambia, los motivos no se eliminan, los de la plantilla
+--    oficial conservan su origen y los que tienen regla propia (VACACION,
+--    SUSPENSIÓN IGSS) no se desactivan.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION setesa_trg_motivo_update()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF setesa_borrado_permitido() THEN
+        RETURN NEW;
+    END IF;
+    IF NEW.nombre IS DISTINCT FROM OLD.nombre
+       OR NEW.en_plantilla IS DISTINCT FROM OLD.en_plantilla
+       OR NEW.protegido IS DISTINCT FROM OLD.protegido THEN
+        RAISE EXCEPTION 'SETESA: de un motivo solo puede cambiarse si está activo.';
+    END IF;
+    IF OLD.protegido AND NOT NEW.activo THEN
+        RAISE EXCEPTION 'SETESA: el motivo % tiene una regla propia y no se desactiva.',
+            OLD.nombre;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_motivo_update ON motivo_ausencia;
+CREATE TRIGGER trg_motivo_update
+    BEFORE UPDATE ON motivo_ausencia
+    FOR EACH ROW EXECUTE FUNCTION setesa_trg_motivo_update();
+
+
+CREATE OR REPLACE FUNCTION setesa_trg_motivo_delete()
+RETURNS TRIGGER
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT setesa_borrado_permitido() THEN
+        RAISE EXCEPTION 'SETESA: los motivos no se eliminan; desactívelo.';
+    END IF;
+    RETURN OLD;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_motivo_delete ON motivo_ausencia;
+CREATE TRIGGER trg_motivo_delete
+    BEFORE DELETE ON motivo_ausencia
+    FOR EACH ROW EXECUTE FUNCTION setesa_trg_motivo_delete();

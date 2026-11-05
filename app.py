@@ -12,6 +12,7 @@ from src.features import (
     feriados,
     gestion_usuarios,
     mis_datos,
+    motivos,
     notificaciones,
     reasignacion,
 )
@@ -107,12 +108,13 @@ else:
 
     elif st.session_state['rol'] == 'Administrador':
         st.title("Panel Gerencial - SETESA")
-        tab1, tab2, tab3, tab4 = st.tabs(
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(
             [
                 "📊 Dashboard de Solicitudes",
                 "🔁 Reasignar Coordinador",
                 "🛡️ Control de Vigencia",
                 "🗓️ Feriados",
+                "🏷️ Motivos de ausencia",
             ]
         )
         with tab1:
@@ -123,3 +125,5 @@ else:
             vigencia.mostrar_panel_vigencia()
         with tab4:
             feriados.mostrar_panel_feriados()
+        with tab5:
+            motivos.mostrar_panel_motivos()

@@ -325,6 +325,23 @@ CREATE TABLE IF NOT EXISTS intento_login (
 );
 
 -- ---------------------------------------------------------------------------
+-- Fase 21: catálogo mantenible de motivos de ausencia (lo siembra
+--   scripts/migracion_fase21.py con los 22 motivos de la plantilla oficial).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS motivo_ausencia (
+    id_motivo      SERIAL PRIMARY KEY,
+    nombre         VARCHAR(50) NOT NULL,
+    activo         BOOLEAN NOT NULL DEFAULT TRUE,
+    en_plantilla   BOOLEAN NOT NULL DEFAULT FALSE,
+    protegido      BOOLEAN NOT NULL DEFAULT FALSE,
+    id_creador     INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    fecha_creacion TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_motivo_ausencia_nombre
+    ON motivo_ausencia (UPPER(nombre));
+
+-- ---------------------------------------------------------------------------
 -- Fase 13: las reglas de integridad y vigencia en el motor de datos están en
 -- docs/triggers.sql (se aplican con scripts/migracion_fase13.py).
 -- ---------------------------------------------------------------------------
