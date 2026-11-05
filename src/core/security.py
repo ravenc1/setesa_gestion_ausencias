@@ -17,6 +17,16 @@ ROL_CONTABILIDAD = "Contabilidad"
 ROL_IT = "IT"
 ROLES_PANEL = ("Administrador", ROL_CONTABILIDAD)
 
+# Fase 18: nombre que se muestra en pantalla (en la base sigue "Contabilidad").
+NOMBRES_VISIBLES = {
+    ROL_CONTABILIDAD: "Contabilidad y RR.HH.",
+    "Administrador": "Administrador (Gerencia)",
+}
+
+
+def nombre_rol_visible(nombre_rol):
+    return NOMBRES_VISIBLES.get(nombre_rol, nombre_rol)
+
 
 def hash_password(password):
     """Genera un hash PBKDF2-SHA256 con sal aleatoria."""

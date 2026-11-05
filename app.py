@@ -12,6 +12,7 @@ from src.features import (
     feriados,
     gestion_usuarios,
     mis_datos,
+    notificaciones,
     reasignacion,
 )
 
@@ -41,15 +42,25 @@ else:
 
     st.sidebar.title("Perfil de Usuario")
     st.sidebar.write(f"**Nombre:** {st.session_state['nombre']}")
-    st.sidebar.write(f"**Rol RBAC:** {st.session_state['rol']}")
+    from src.core.security import nombre_rol_visible
+
+    st.sidebar.write(f"**Rol:** {nombre_rol_visible(st.session_state['rol'])}")
     st.sidebar.write("---")
 
-    # Fase 14: Consultor y Contabilidad tienen además la sección "Mis datos".
+    # Fase 14: Consultor y Contabilidad tienen además "Mis datos"; Fase 18:
+    # ambos reciben avisos al finalizar un expediente.
     seccion = None
     if st.session_state['rol'] in ('Consultor', 'Contabilidad'):
-        seccion = st.sidebar.radio(
-            "Sección", ["Principal", "🪪 Mis datos"], key="seccion_menu"
+        etiqueta_avisos = notificaciones.etiqueta_menu(
+            st.session_state.get('id_usuario')
         )
+        seccion = st.sidebar.radio(
+            "Sección",
+            ["Principal", etiqueta_avisos, "🪪 Mis datos"],
+            key="seccion_menu",
+        )
+        if seccion == etiqueta_avisos:
+            seccion = "avisos"
         st.sidebar.write("---")
 
     if st.sidebar.button("Cerrar Sesión", width="stretch"):
@@ -62,6 +73,9 @@ else:
     if seccion == "🪪 Mis datos":
         mis_datos.mostrar_mis_datos()
 
+    elif seccion == "avisos":
+        notificaciones.mostrar_notificaciones()
+
     elif st.session_state['rol'] == 'Consultor':
         st.title("Panel Operativo - Consultor Técnico")
         registro.mostrar_formulario()
@@ -72,7 +86,7 @@ else:
         
     elif st.session_state['rol'] == 'Contabilidad':
         # HU-03: repositorio de expedientes en modo consulta.
-        st.title("Panel de Contabilidad - SETESA")
+        st.title("Panel de Contabilidad y RR.HH. - SETESA")
         dashboard.mostrar_dashboard()
 
     elif st.session_state['rol'] == 'IT':

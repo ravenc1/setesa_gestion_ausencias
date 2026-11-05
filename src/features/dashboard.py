@@ -33,6 +33,7 @@ from src.services.documentos import (
     preparar_pdf_descarga,
     verificar_integridad_pdf,
 )
+from src.features.evidencias import mostrar_evidencias
 from src.services.utils_firma import canvas_to_base64
 
 logger = obtener_logger("setesa.dashboard")
@@ -194,6 +195,21 @@ def _mostrar_descargas(df_filtrado):
         )
 
 
+def _mostrar_evidencias(df_filtrado):
+    """Fase 18: evidencias del expediente (Gerencia y Contabilidad y RR.HH.)."""
+    if df_filtrado.empty:
+        return
+    st.write("---")
+    st.markdown("#### 📎 Evidencias del expediente")
+    id_ev = st.selectbox(
+        "Expediente:",
+        df_filtrado["id_solicitud"].tolist(),
+        format_func=lambda valor: _etiqueta_solicitud(df_filtrado, valor),
+        key="evidencias_expediente",
+    )
+    mostrar_evidencias(id_ev, st.session_state.get("id_usuario"), "dash")
+
+
 def _mostrar_trazabilidad(df_filtrado):
     """Historial de estados en modo consulta (rol Contabilidad, HU-03)."""
     st.write("---")
@@ -219,13 +235,13 @@ def mostrar_dashboard():
     if not rol_autorizado(ROLES_PANEL):
         st.error(
             "Acceso denegado: esta sección es exclusiva de Gerencia y "
-            "Contabilidad."
+            "Contabilidad y RR.HH."
         )
         return
 
     solo_lectura = es_solo_lectura()
     st.markdown(
-        "### Panel de Contabilidad – Repositorio de Expedientes"
+        "### Contabilidad y RR.HH. – Repositorio de Expedientes"
         if solo_lectura
         else "### Panel de Control Gerencial y Aprobaciones"
     )
@@ -330,6 +346,7 @@ def mostrar_dashboard():
 
     _mostrar_tabla(df_filtrado)
     _mostrar_descargas(df_filtrado)
+    _mostrar_evidencias(df_filtrado)
 
     if df_filtrado.empty:
         return
