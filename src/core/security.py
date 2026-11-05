@@ -12,6 +12,9 @@ ITERATIONS = 240000
 # HU-03: Gerencia y Contabilidad comparten el repositorio de expedientes, pero
 # Contabilidad solo consulta y descarga; no autoriza ni administra catálogos.
 ROL_CONTABILIDAD = "Contabilidad"
+# Fase 9: IT administra cuentas (altas, ediciones, bajas y resets) sin acceso
+# al dashboard, las firmas, la vigencia ni los feriados.
+ROL_IT = "IT"
 ROLES_PANEL = ("Administrador", ROL_CONTABILIDAD)
 
 

@@ -40,8 +40,8 @@ están cerrados:**
 
 **Conclusión:** el sistema está **100 % funcional** y con los RNF verificables
 cubiertos. Quedan únicamente **D-06** (rechazo/devolución, fuera del alcance) y
-las mejoras adicionales de gestión de usuarios y endurecimiento del login, que
-no forman parte del alcance mínimo de la tesis.
+el endurecimiento del login (límite de intentos), que no forma parte del alcance
+mínimo de la tesis.
 
 ### Registro de avance
 
@@ -56,6 +56,7 @@ no forman parte del alcance mínimo de la tesis.
 | 27/10/2026 | **Fase 6** | Cifrado Fernet, sello SHA-256, SQLAlchemy, logging rotativo, CI y guía de despliegue. **H-11/H-13/H-19/H-20/H-21/H-23 y D-05 cerrados.** |
 | 04/11/2026 | **Fase 7** | Rol **Contabilidad** de solo lectura (HU-03): panel propio, filtros, trazabilidad y descarga del PDF final, sin autorización ni administración. **D-02 cerrado.** |
 | 04/11/2026 | **Fase 8** | Recordatorio auditable del consultor al Coordinador GTC (R-11): botón en el historial, bandeja de recordatorios, enlace de correo `mailto` y cooldown de 24 h. **R-11 cerrado.** |
+| 04/11/2026 | **Fase 9** | Rol **IT** y gestión de usuarios: altas, edición, bajas/reactivaciones, reseteo de contraseña, auditoría en `usuario_log` y protecciones. |
 
 **Evidencias:** `docs/evidencias/2026-10-27_fase0-1.md`,
 `docs/evidencias/2026-10-27_fase2.md`,
@@ -63,9 +64,10 @@ no forman parte del alcance mínimo de la tesis.
 `docs/evidencias/2026-10-27_fase4.md`,
 `docs/evidencias/2026-10-27_fase5.md` y
 `docs/evidencias/2026-10-27_fase6.md`; **Fase 7** en
-`docs/evidencias/2026-11-04_fase7.md` y **Fase 8** en
-`docs/evidencias/2026-11-04_fase8.md`.
-**Pruebas al cierre:** `pytest` 104/104 y smoke test 57/57, sin datos de prueba
+`docs/evidencias/2026-11-04_fase7.md`, **Fase 8** en
+`docs/evidencias/2026-11-04_fase8.md` y **Fase 9** en
+`docs/evidencias/2026-11-04_fase9.md`.
+**Pruebas al cierre:** `pytest` 118/118 y smoke test 57/57, sin datos de prueba
 residuales en la base.
 
 **Hallazgos cerrados:** H-01, H-02, H-03, H-04, H-05, H-06, H-07, H-08, H-09,
@@ -159,10 +161,11 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | N-07 | RBAC por módulo | ✅ | `rol_autorizado()` + revalidación de vigencia en cada rerun (`app.py`) | — |
 | N-08 | **Esquema SQL versionado** | ✅ | `docs/schema.sql` validado en esquema temporal | — |
 | N-09 | README de instalación/ejecución | ✅ | `README.md` | — |
-| N-10 | Pruebas automatizadas (pytest) | ✅ | 104 pruebas (unitarias, integración, PDF, cifrado, vigencia, reportes, feriados, vacaciones, recordatorios y AppTest) | — |
+| N-10 | Pruebas automatizadas (pytest) | ✅ | 118 pruebas (unitarias, integración, PDF, cifrado, vigencia, reportes, feriados, vacaciones, recordatorios, gestión de usuarios y AppTest) | — |
 | N-11 | Advertencia `pd.read_sql_query` | ✅ | Lecturas migradas a `get_engine()` (SQLAlchemy) | H-21 |
 | N-12 | Limpieza de firmas temporales | ✅ | `utils_firma.eliminar_archivo` + `finally` en el motor; verificado por `test_documentos` | — |
 | N-13 | Logging de errores | ✅ | Logger rotativo `setesa` en `storage/logs/setesa.log` | H-23 |
+| N-14 | Gestión de usuarios con auditoría | ✅ | **Fase 9**: rol IT, `gestion_usuarios.py`, tabla `usuario_log`, protecciones y política de contraseña | — |
 
 ### 4.2 Módulo `auth.py` (RF-01 / RNF-01)
 
@@ -170,7 +173,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 |---|---|---|---|
 | A-01 | Login con correo + contraseña | ✅ | Verifica hash y auto-migra texto plano |
 | A-02 | Bloqueo de usuario inactivo | ✅ | Mensaje “Usuario inactivo (Baja Lógica)” |
-| A-03 | Enrutamiento por rol | ✅ | `app.py` → Consultor / Coordinador GTC / Administrador |
+| A-03 | Enrutamiento por rol | ✅ | `app.py` → Consultor / Coordinador GTC / Administrador / Contabilidad / IT |
 | A-04 | **Actualizar `ultima_actividad`** | ✅ | Login y acciones relevantes (`marcar_actividad`); solo usuarios vigentes |
 | A-05 | Normalizar correo (trim/lower) | ✅ | `login_user` normaliza entrada y compara con `LOWER(...)` |
 | A-06 | Revalidar vigencia en sesión activa | ✅ | `app.py` expulsa sesiones dadas de baja en cada rerun |
@@ -252,7 +255,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | V-02 | Baja lógica sin borrado | ✅ | `UPDATE estado_vigencia = FALSE` |
 | V-03 | Reporte de afectados | ✅ | DataFrame con los desactivados |
 | V-04 | **Dependencia de `ultima_actividad`** | ✅ | Se actualiza en login y escrituras; cubierto por `test_vigencia` |
-| V-05 | Salvaguarda de administradores | ✅ | `ROLES_PROTEGIDOS` excluye Administrador; también se excluye al ejecutor |
+| V-05 | Salvaguarda de administradores | ✅ | `ROLES_PROTEGIDOS` excluye Administrador e IT; también se excluye al ejecutor |
 | V-06 | Auditoría de la depuración | ✅ | `vigencia_log` registra fecha, ejecutor, acción, afectados y detalle |
 | V-07 | Ejecución automática semestral | ✅ | Al login de Gerencia + `scripts/vigencia_semestral.py` (`--forzar`) |
 | V-08 | Reactivación de usuario | ✅ | Panel de Gerencia con reactivación auditada |
@@ -298,6 +301,19 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | S-09 | Guía de despliegue | ✅ | `docs/DESPLIEGUE.md` (Supabase, Streamlit Cloud, respaldo y operación) |
 | S-10 | Configuración unificada | ✅ | `config.obtener_variable`: entorno o `st.secrets` |
 
+### 4.11 Gestión de usuarios (Fase 9)
+
+| # | Ítem | Estado | Detalle |
+|---|---|---|---|
+| G-01 | Rol IT separado | ✅ | Solo ve el panel de usuarios; sin dashboard, firmas, vigencia ni feriados |
+| G-02 | Alta de usuarios | ✅ | Nombre, correo, rol, días de vacaciones y contraseña inicial |
+| G-03 | Edición | ✅ | Nombre, correo, rol y días; no permite cambiar el rol propio |
+| G-04 | Baja lógica y reactivación | ✅ | Sin borrar historial; bloquea la autodesactivación y al último Administrador/IT |
+| G-05 | Reseteo de contraseña | ✅ | PBKDF2-SHA256, mínimo 8 con letra y número |
+| G-06 | Auditoría | ✅ | Tabla `usuario_log` con ejecutor, afectado, fecha, acción y detalle |
+| G-07 | Vigencia | ✅ | IT queda protegido de la baja automática semestral |
+| G-08 | Migración y pruebas | ✅ | `scripts/migracion_fase9.py` y `tests/test_gestion_usuarios.py` (13 pruebas) |
+
 ---
 
 ## 5. Checklist de pruebas y evidencias
@@ -305,7 +321,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | ID | Caso | Estado declarado en tesis | Estado real verificado | Brecha |
 |---|---|---|---|---|
 | QA-01 | Login usuario inactivo | Aprobado | ✅ `test_login_usuario_inactivo_es_rechazado` (AppTest) | — |
-| QA-02 | Enrutamiento por rol | Aprobado | ✅ AppTest renderiza los 3 paneles | — |
+| QA-02 | Enrutamiento por rol | Aprobado | ✅ AppTest renderiza los 5 paneles | — |
 | QA-03 | Registro + ACID | Aprobado | ✅ Smoke test + test de integración | — |
 | QA-04 | Flujo de aprobación | Aprobado | ✅ Smoke test + transiciones inválidas rechazadas | — |
 | QA-05 | Motor documental | Aprobado | ✅ Smoke test + `test_documentos` validan 3 firmas | — |
@@ -317,7 +333,7 @@ Leyenda: ✅ completo y verificado · 🟡 parcial / en proceso · 🔴 pendient
 | PR-05 | Baja lógica | Completado | ✅ `vigencia_log`, salvaguarda, reactivación y expulsión de sesión | — |
 | PR-06 | Firma incrustada | En proceso | ✅ Completado: 3 firmas capturadas, persistidas y estampadas | — |
 
-**Cobertura automatizada actual:** 104 pruebas pytest + 57 checks del smoke test.
+**Cobertura automatizada actual:** 118 pruebas pytest + 57 checks del smoke test.
 Cubren: días hábiles con feriados, seguridad, transiciones válidas/inválidas,
 historial, firma obligatoria y persistida, PDF con 3 imágenes, `ruta_pdf`,
 limpieza de temporales, integración contra BD real, render de los 3 paneles,
@@ -491,7 +507,7 @@ cerró después, en la Fase 8).
 - [x] **H-23** Logging centralizado.
 - [x] **H-19** Suite de pruebas completa (unitaria + integración + E2E) y CI.
 - [x] **H-20** README, `docs/ESTRUCTURA.md`, `docs/DESPLIEGUE.md` y evidencias.
-- [x] Regresión completa QA-01…QA-06 y PR-01…PR-06 (104 pytest + 57 smoke).
+- [x] Regresión completa QA-01…QA-06 y PR-01…PR-06 (118 pytest + 57 smoke).
 - [ ] Transcribir el estado final a las tablas 25, 26 y 27 del PDF de la tesis.
 
 **Criterio de aceptación:** 6/6 QA y 6/6 PR con evidencia; documentación
@@ -526,6 +542,23 @@ administrar catálogos. ✅ **Cumplido.**
 historial, el Coordinador GTC lo ve en su bandeja y, al firmar, el recordatorio
 queda atendido. ✅ **Cumplido.**
 
+### Fase 9 — Gestión de usuarios (1 día) · rol IT
+
+- [x] **Rol IT** separado, con acceso solo al panel de usuarios.
+- [x] **Listado** con rol, vigencia, última actividad y vacaciones asignadas/usadas/disponibles.
+- [x] **Alta** con nombre, correo registrado (cualquier dominio), rol, días y contraseña inicial.
+- [x] **Edición** de nombre, correo, rol y días.
+- [x] **Baja lógica y reactivación**, sin borrar historial.
+- [x] **Reseteo de contraseña** con PBKDF2 y política mínima.
+- [x] **Auditoría** en `usuario_log` con ejecutor, afectado, fecha, acción y detalle.
+- [x] **Protecciones**: sin autodesactivación, sin cambio de rol propio y sin dejar el sistema sin Administrador ni IT activo.
+- [x] **Migración** `scripts/migracion_fase9.py` y pruebas `tests/test_gestion_usuarios.py` (13).
+- [x] Documentación: README, checklist y evidencia `docs/evidencias/2026-11-04_fase9.md`.
+
+**Criterio de aceptación:** IT crea una cuenta, la edita, la da de baja, la
+reactiva y le restablece la contraseña, y cada operación queda auditada; ningún
+otro rol puede gestionar usuarios. ✅ **Cumplido.**
+
 ---
 
 ## 9. Definición de “terminado” (DoD) para cada fase
@@ -558,6 +591,7 @@ Una tarea se considera cerrada solo si:
 | Área | Cumplimiento estimado | Estado |
 |---|---|---|
 | Autenticación / RBAC | 100 % | 🟢 |
+| Gestión de usuarios | 100 % | 🟢 |
 | Registro de solicitudes | 100 % | 🟢 |
 | Motor PDF | 90 % | 🟢 |
 | Workflow / trazabilidad | 90 % | 🟢 |
@@ -570,30 +604,30 @@ Una tarea se considera cerrada solo si:
 | Documentación técnica | 100 % | 🟢 |
 | **Total ponderado** | **~99 %** | 🟢 |
 
-El 1 % restante corresponde a D-06 (rechazo/devolución, fuera de alcance). La
-gestión de usuarios desde el panel y el endurecimiento del login son mejoras
-adicionales, no requisitos pendientes de la tesis.
+El 1 % restante corresponde a D-06 (rechazo/devolución, fuera de alcance). El
+endurecimiento del login es una mejora adicional, no un requisito pendiente de
+la tesis.
 
 ---
 
 ## 12. Próximo paso recomendado
 
-Las fases 0–8 están cerradas. Para la entrega y defensa:
+Las fases 0–9 están cerradas. Para la entrega y defensa:
 
 1. ~~Transcribir a las tablas 25, 26 y 27 del PDF de la tesis el estado final~~
    **No aplica:** el documento de tesis quedó cerrado el 04/11/2026 y no se
    modifica; las mejoras posteriores se documentan solo en este repositorio.
-2. Preparar la demostración: login por rol (incluido **Contabilidad**), registro
-   con firma, aprobación GTC, autorización de Gerencia, descarga del PDF sellado
-   y verificación SHA-256.
-3. Mostrar la evidencia de calidad: 104 pruebas pytest, 57 checks E2E y CI en
+2. Preparar la demostración: login por rol (incluidos **Contabilidad** e **IT**),
+   registro con firma, aprobación GTC, autorización de Gerencia, descarga del PDF
+   sellado y verificación SHA-256.
+3. Mostrar la evidencia de calidad: 118 pruebas pytest, 57 checks E2E y CI en
    GitHub Actions.
 4. Confirmar la custodia de `FERNET_KEY` y el respaldo de Supabase antes de la
    presentación.
-5. Siguiente mejora acordada: **gestión de usuarios desde el panel de Gerencia**
-   (alta, edición, activación/desactivación y reseteo de contraseña).
+5. Siguiente mejora acordada: **endurecimiento del login** (límite de intentos
+   fallidos y bloqueo temporal).
 
-Con las Fases 0–8 cerradas, el proyecto queda listo para la defensa con evidencia
+Con las Fases 0–9 cerradas, el proyecto queda listo para la defensa con evidencia
 de QA y RNF verificables.
 
 ---

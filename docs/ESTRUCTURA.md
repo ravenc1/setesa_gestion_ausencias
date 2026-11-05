@@ -37,6 +37,7 @@ proyecto_setesa/
 │   │   ├── validaciones.py    # Reglas de fechas y saldo en servidor
 │   │   ├── usuarios.py        # Usuarios por rol (jefe GTC)
 │   │   ├── recordatorios.py   # Recordatorios al Coordinador GTC (R-11)
+│   │   ├── gestion_usuarios.py # Altas, edición, bajas y auditoría (Fase 9)
 │   │   ├── utils.py           # Lógica pura (calcular_dias_habiles)
 │   │   └── config.py          # Rutas y variables (.env o st.secrets)
 │   ├── features/              # Módulos funcionales por rol
@@ -44,7 +45,8 @@ proyecto_setesa/
 │   │   ├── coordinador.py     # Panel Coordinador GTC (CU-04)
 │   │   ├── dashboard.py       # Panel gerencial + filtros + descargas (CU-05)
 │   │   ├── feriados.py        # Administración de feriados (Gerencia)
-│   │   └── vigencia.py        # Baja lógica semestral (CU-06)
+│   │   ├── vigencia.py        # Baja lógica semestral (CU-06)
+│   │   └── gestion_usuarios.py # Panel de IT: cuentas y auditoría (Fase 9)
 │   └── services/              # Servicios de soporte
 │       ├── documentos.py      # PDF oficial desde la BD + ruta_pdf + descarga
 │       ├── motor_pdf.py       # Generación de PDF (RF-03)
@@ -58,6 +60,7 @@ proyecto_setesa/
 │   ├── migracion_fase6.py     # sello SHA-256 + cifrado de datos heredados
 │   ├── migracion_fase7.py     # rol Contabilidad (HU-03) + cuenta demo
 │   ├── migracion_fase8.py     # tabla recordatorio (R-11)
+│   ├── migracion_fase9.py     # rol IT + usuario_log + cuenta demo opcional
 │   ├── vigencia_semestral.py  # Ejecución programada (cron/Task Scheduler)
 │   └── hash_passwords.py      # Migración de contraseñas a hash
 │
@@ -79,6 +82,7 @@ proyecto_setesa/
 │   ├── test_app_smoke.py      # Renderizado con AppTest + login inactivo
 │   ├── test_rbac_contabilidad.py  # HU-03: panel de solo lectura
 │   ├── test_recordatorios.py      # R-11: envío, cooldown y atención
+│   ├── test_gestion_usuarios.py   # Fase 9: altas, edición, bajas y auditoría
 │   └── smoke_test.py          # Prueba E2E manual (rollback/limpieza)
 │
 ├── docs/
@@ -266,14 +270,31 @@ ambas en los secrets de Streamlit). La guía completa está en
   atendidos en la misma transacción.
 - Cubierto por `tests/test_recordatorios.py` (7 pruebas).
 
+## Módulo Gestión de Usuarios (Fase 9)
+
+- `gestion_usuarios.py` (core) concentra validaciones, transacciones y
+  auditoría; `features/gestion_usuarios.py` compone el panel.
+- Solo el rol **IT** accede. La autorización se revalida contra la base, no solo
+  contra `st.session_state`.
+- El correo registrado se normaliza a minúsculas y puede ser de cualquier
+  dominio (SETESA, banco o personal).
+- Contraseñas: mínimo 8 caracteres, con al menos una letra y un número, con
+  PBKDF2-SHA256.
+- Protecciones: sin autodesactivación, sin cambio de rol propio y sin dejar el
+  sistema sin Administrador ni IT activo.
+- Cada alta, edición, baja, reactivación y reseteo se guarda en `usuario_log`
+  dentro de la misma transacción.
+- Cubierto por `tests/test_gestion_usuarios.py` (13 pruebas).
+
 ## Pendientes conocidos
 
 - **D-06**: rechazo/devolución con motivo (diferido; fuera del alcance acordado).
-- **Gestión de usuarios**: alta/edición/reseteo desde el panel (siguiente mejora).
 - **Endurecimiento del login**: límite de intentos y bloqueo temporal (mejora).
 
 **Cerrado en la Fase 7:** D-02 (rol Contabilidad de solo lectura, HU-03).
 **Cerrado en la Fase 8:** R-11 (recordatorio al banco con bandeja y `mailto:`).
+**Cerrado en la Fase 9:** gestión de usuarios con rol IT, auditoría y
+protecciones.
 
 **Nota documental:** el documento de tesis quedó cerrado el 04/11/2026; las
 mejoras posteriores se registran solo en este repositorio y no modifican el PDF.

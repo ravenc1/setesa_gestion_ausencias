@@ -118,6 +118,22 @@ CREATE TABLE IF NOT EXISTS recordatorio (
 );
 
 -- ---------------------------------------------------------------------------
+-- Auditoría de la gestión manual de usuarios (Fase 9)
+--   Registra altas, ediciones, bajas, reactivaciones y resets de contraseña.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS usuario_log (
+    id_log      SERIAL PRIMARY KEY,
+    fecha       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id_ejecutor INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    id_afectado INTEGER REFERENCES usuario(id_usuario) ON DELETE SET NULL,
+    accion      VARCHAR(20) NOT NULL,
+    detalle     TEXT,
+    CONSTRAINT usuario_log_accion_check CHECK (
+        accion IN ('CREACION', 'EDICION', 'BAJA', 'REACTIVACION', 'RESET_PASSWORD')
+    )
+);
+
+-- ---------------------------------------------------------------------------
 -- Auditoría del algoritmo de vigencia (RF-05 / CU-06)
 --   Guarda cada depuración y cada reactivación, con su ejecutor.
 -- ---------------------------------------------------------------------------
@@ -158,6 +174,12 @@ CREATE INDEX IF NOT EXISTS idx_recordatorio_destino
 CREATE INDEX IF NOT EXISTS idx_recordatorio_solicitud
     ON recordatorio (id_solicitud, fecha DESC);
 
+CREATE INDEX IF NOT EXISTS idx_usuario_log_fecha
+    ON usuario_log (fecha DESC);
+
+CREATE INDEX IF NOT EXISTS idx_usuario_log_afectado
+    ON usuario_log (id_afectado, fecha DESC);
+
 CREATE INDEX IF NOT EXISTS idx_vigencia_log_fecha
     ON vigencia_log (fecha_ejecucion DESC);
 
@@ -171,7 +193,8 @@ INSERT INTO rol (nombre_rol, descripcion_rol) VALUES
     ('Consultor', 'Registra solicitudes de ausencia y consulta su historial.'),
     ('Administrador', 'Gerencia: autoriza solicitudes, consulta métricas y ejecuta la vigencia.'),
     ('Coordinador GTC', 'Jefe inmediato del banco: otorga el visto bueno de las solicitudes.'),
-    ('Contabilidad', 'Solo lectura: consulta el repositorio de expedientes y descarga el PDF final (HU-03).')
+    ('Contabilidad', 'Solo lectura: consulta el repositorio de expedientes y descarga el PDF final (HU-03).'),
+    ('IT', 'Gestión de usuarios: altas, ediciones, bajas, reactivaciones y reseteo de contraseñas.')
 ON CONFLICT (nombre_rol) DO NOTHING;
 
 -- Feriados nacionales de Guatemala (días completos). Semana Santa: jueves,

@@ -1,6 +1,6 @@
 # Prueba de humo de la interfaz con AppTest de Streamlit.
 #
-# Verifica que el login y los cuatro paneles por rol se rendericen sin
+# Verifica que el login y los cinco paneles por rol se rendericen sin
 # excepciones. No sustituye las pruebas de integración, pero detecta errores
 # de importación, de estado de sesión y de renderizado.
 
@@ -26,7 +26,8 @@ def test_pantalla_login_sin_excepciones():
     not os.getenv("DATABASE_URL"), reason="Requiere DATABASE_URL."
 )
 @pytest.mark.parametrize(
-    "rol", ["Consultor", "Coordinador GTC", "Administrador", "Contabilidad"]
+    "rol",
+    ["Consultor", "Coordinador GTC", "Administrador", "Contabilidad", "IT"],
 )
 def test_panel_por_rol_sin_excepciones(rol):
     conn = get_connection()

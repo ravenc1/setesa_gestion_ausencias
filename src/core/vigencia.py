@@ -17,7 +17,9 @@ from src.core.logging_config import obtener_logger
 logger = obtener_logger("setesa.vigencia")
 
 MESES_VIGENCIA = 6
-ROLES_PROTEGIDOS = ("Administrador",)
+# IT también se protege: si la única cuenta de gestión se diera de baja por
+# inactividad, nadie podría crear o reactivar usuarios.
+ROLES_PROTEGIDOS = ("Administrador", "IT")
 
 ACCION_DEPURACION = "DEPURACION"
 ACCION_AUTOMATICA = "AUTOMATICA"

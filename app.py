@@ -4,7 +4,14 @@
 import streamlit as st
 from src.core import auth
 from src.core.logging_config import configurar_logging
-from src.features import registro, dashboard, vigencia, coordinador, feriados
+from src.features import (
+    registro,
+    dashboard,
+    vigencia,
+    coordinador,
+    feriados,
+    gestion_usuarios,
+)
 
 configurar_logging()
 
@@ -51,6 +58,11 @@ else:
         # HU-03: repositorio de expedientes en modo consulta.
         st.title("Panel de Contabilidad - SETESA")
         dashboard.mostrar_dashboard()
+
+    elif st.session_state['rol'] == 'IT':
+        # Fase 9: el rol IT solo administra cuentas.
+        st.title("Panel de IT - Gestión de Usuarios")
+        gestion_usuarios.mostrar_panel_usuarios()
 
     elif st.session_state['rol'] == 'Administrador':
         st.title("Panel Gerencial - SETESA")
