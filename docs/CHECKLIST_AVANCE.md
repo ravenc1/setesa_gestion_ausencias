@@ -618,6 +618,28 @@ finalizados; si se necesitara, debe correr con `setesa.permitir_borrado`.
 
 ---
 
+### Fase 14 — «Mis datos» y vigencia por actualización de datos · tesis 1.5 y objetivo c
+
+- [x] **Mis datos** (Consultor y Contabilidad y RR.HH.): el consultor confirma puesto, código de empleado y teléfono; Contabilidad, puesto y teléfono. Nombre, correo y rol siguen a cargo de IT.
+- [x] **Plazo de 6 meses** desde `usuario.fecha_actualizacion_datos`; cada confirmación lo renueva (ciclo repetitivo).
+- [x] **Aviso** en cada pantalla desde 30 días antes del vencimiento.
+- [x] **Vigencia**: la baja lógica automática (app, trigger y pg_cron) aplica solo a quien no actualizó sus datos en 6 meses. Coordinador GTC, Administrador e IT no vencen: IT los da de baja manualmente.
+- [x] **IT**: pestañas «Reasignar Coordinador» (también disponible para Gerencia) y «Por vencer», con enlace de correo; la lista de usuarios muestra el plazo de cada uno.
+- [x] **Reactivación** (IT o Gerencia) reinicia el plazo de 6 meses.
+- [x] El teléfono se guarda cifrado; la auditoría (`ACTUALIZACION_DATOS` en `usuario_log`) registra qué campos cambiaron, sin sus valores.
+- [x] El formulario de ausencia precarga puesto y código desde «Mis datos».
+- [x] Migración `scripts/migracion_fase14.py` (`--simular`): los usuarios existentes inician su plazo el día de la migración.
+- [x] Pruebas: `tests/test_perfil.py` (16) y `tests/test_triggers.py` (20).
+
+**Criterio de aceptación:** quien actualiza sus datos antes del plazo sigue
+activo; quien no, pasa a baja lógica sin perder su historial. ✅ **Cumplido.**
+
+**Diferencia con la tesis:** RF-06 habla de "6 meses sin actividad"; por
+decisión del 05/11/2026 se mide por la actualización de datos (sección 1.5 y
+objetivo c) y los coordinadores del banco quedan fuera de la baja automática.
+
+---
+
 ## 9. Definición de “terminado” (DoD) para cada fase
 
 Una tarea se considera cerrada solo si:
