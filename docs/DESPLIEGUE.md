@@ -265,6 +265,26 @@ Recomendaciones:
 
 ---
 
+## 8b. Despliegue del prototipo en Render (plan gratuito)
+
+Configuración en `render.yaml` (región Oregón, junto a Supabase us-west-2).
+
+1. **Base limpia:** `python scripts/instalar_produccion.py` (lee `.env.produccion`;
+   toma la contraseña del primer usuario IT de la variable de entorno o la pide
+   por pantalla, y fuerza su cambio en el primer ingreso). Se niega a correr si
+   la base ya tiene usuarios o es la de pruebas.
+2. **Render:** New → Blueprint desde el repositorio; cargar en el panel los
+   secretos marcados `sync: false` (`DATABASE_URL`, `FERNET_KEY`,
+   `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, SMTP, `SOPORTE_CORREO`, `APP_URL`).
+3. **Respaldo:** `python scripts/respaldo.py respaldar` genera tablas (.jsonl),
+   archivos del bucket con SHA-256 y manifiesto. Restaurar:
+   `python scripts/respaldo.py restaurar CARPETA --confirmar-reemplazo [--simular]`
+   (transaccional: todo o nada).
+4. **Plan gratuito:** el servicio se duerme tras inactividad; abrir la URL unos
+   minutos antes de una demostración.
+
+---
+
 ## 9. Despliegue en servidor propio, VM o contenedor
 
 Requisitos:
