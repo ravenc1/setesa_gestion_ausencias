@@ -143,6 +143,8 @@ def test_dataframe_vacio():
         "pendientes_coordinador": 0,
         "pendientes_gerencia": 0,
         "finalizadas": 0,
+        "aprobadas": 0,
+        "denegadas": 0,
     }
     assert list(resumen_por_tipo(None).columns) == ["tipo_ausencia", "cantidad"]
 
@@ -154,6 +156,8 @@ def test_calcular_kpis(solicitudes):
         "pendientes_coordinador": 1,
         "pendientes_gerencia": 1,
         "finalizadas": 2,
+        "aprobadas": 2,
+        "denegadas": 0,
     }
 
 
