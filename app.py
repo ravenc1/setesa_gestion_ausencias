@@ -25,7 +25,7 @@ from src.features import (
 configurar_logging()
 
 st.set_page_config(
-    page_title="SETESA Workflow",
+    page_title="SETESA Ausencias",
     page_icon=str(estilos.ICONO) if estilos.ICONO.exists() else "🏢",
     layout="wide",
     initial_sidebar_state="expanded",

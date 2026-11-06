@@ -334,7 +334,7 @@ def generar_pdf_accion_personal(nombre_empleado, jefe_gtc, puesto, codigo, tipo_
     hoja.fuente(7)
     pdf.set_xy(X_COL["B"], max(y + 3, 280))
     pie = f"Expediente #{id_solicitud} - " if id_solicitud else ""
-    pie += f"Estado: {estado_workflow} - Generado por SETESA Workflow el {datetime.date.today():%d/%m/%Y}"
+    pie += f"Estado: {estado_workflow} - Generado por SETESA Ausencias el {datetime.date.today():%d/%m/%Y}"
     pdf.cell(X_FIN - X_COL["B"], 4, _latin1(pie), 0, 0, "C")
 
     # --- Archivo ----------------------------------------------------------------

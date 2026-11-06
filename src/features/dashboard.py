@@ -464,7 +464,7 @@ def mostrar_dashboard():
         return
 
     st.write("---")
-    st.markdown("#### Gestión de Workflow (Autorización de Gerencia)")
+    st.markdown("#### Gestión del flujo de aprobación (Autorización de Gerencia)")
 
     # Solo se permite la transición que corresponde a Gerencia.
     id_seleccionado = st.selectbox(

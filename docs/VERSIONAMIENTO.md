@@ -1,4 +1,4 @@
-# Versionamiento del proyecto SETESA Workflow
+# Versionamiento del proyecto SETESA Ausencias
 
 Repositorio: https://github.com/ravenc1/setesa_gestion_ausencias (público).
 

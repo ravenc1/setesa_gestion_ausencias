@@ -1,4 +1,4 @@
-# Prueba del flujo completo de SETESA Workflow, de punta a punta.
+# Prueba del flujo completo de SETESA Ausencias, de punta a punta.
 #
 # Recorre con los cinco roles (IT, Consultor, Coordinador GTC, Gerencia y
 # Contabilidad y RR.HH.) todo lo que hace el sistema, contra la base de PRUEBAS:
@@ -608,7 +608,7 @@ def test_24_pantalla_de_it_y_sus_pestanas(mundo):
 def test_25_gerencia_tiene_las_cinco_pestanas_y_ve_la_gestion(mundo):
     at = _sesion(mundo, "gerencia")
     assert len(at.tabs) == 5
-    assert any("Gestión de Workflow" in x.value for x in at.markdown)
+    assert any("Gestión del flujo de aprobación" in x.value for x in at.markdown)
 
 
 def test_26_el_inicio_de_sesion_por_formulario_funciona(mundo):

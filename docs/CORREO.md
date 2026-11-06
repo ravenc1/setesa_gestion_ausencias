@@ -58,7 +58,7 @@ También puede cargarlos desde la terminal con `gh secret set NOMBRE`
 ## 4. Prueba
 
 1. GitHub → **Actions → Recordatorios de actualización de datos → Run
-   workflow** con «simular» marcado: lista a quién escribiría, sin enviar.
+   flujo** con «simular» marcado: lista a quién escribiría, sin enviar.
 2. Repita sin «simular» para enviar de verdad.
 
 Si faltan los secretos, la tarea termina sin hacer nada. GitHub desactiva las

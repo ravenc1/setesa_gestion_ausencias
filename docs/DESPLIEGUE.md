@@ -1,4 +1,4 @@
-# Guía de despliegue — SETESA Workflow
+# Guía de despliegue — SETESA Ausencias
 
 Esta guía describe cómo pasar del entorno local a una instalación operativa con
 **Streamlit + PostgreSQL (Supabase)**, incluyendo variables, migraciones,
@@ -297,7 +297,7 @@ Ejemplo con systemd (Linux):
 
 ```ini
 [Unit]
-Description=SETESA Workflow
+Description=SETESA Ausencias
 After=network.target
 
 [Service]
@@ -318,7 +318,7 @@ Detrás de un proxy inverso (Nginx/Caddy), habilite HTTPS y reenvíe a
 
 ## 10. Integración continua (GitHub Actions)
 
-El workflow `.github/workflows/ci.yml` se ejecuta en cada push o pull request a
+El flujo de trabajo `.github/workflows/ci.yml` se ejecuta en cada push o pull request a
 `main`:
 
 1. instala dependencias;

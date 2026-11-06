@@ -165,7 +165,7 @@ def test_panel_contabilidad_sin_excepciones_y_en_solo_lectura():
         etiquetas = [b.label for b in at.button]
         assert not any("Aprobar, Firmar y Finalizar" in e for e in etiquetas)
         assert not any(
-            "Gestión de Workflow" in m.value for m in at.markdown
+            "Gestión del flujo de aprobación" in m.value for m in at.markdown
         ), "Contabilidad no debe ver la gestión de workflow."
     finally:
         _eliminar_usuario(correo)
@@ -217,4 +217,4 @@ def test_gerencia_conserva_pestanas_y_autorizacion():
     # Dashboard, Reasignar Coordinador (Fase 12), Vigencia, Feriados y
     # Motivos de ausencia (Fase 21).
     assert len(at.tabs) == 5
-    assert any("Gestión de Workflow" in m.value for m in at.markdown)
+    assert any("Gestión del flujo de aprobación" in m.value for m in at.markdown)

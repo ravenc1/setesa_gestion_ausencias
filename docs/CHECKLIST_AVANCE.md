@@ -833,8 +833,10 @@ la base de datos es de pocos milisegundos.
 - [ ] Botón de recordatorio de «Avisos» (mailto) no usa el correo del usuario que lo envía.
 - [ ] Lentitud de la app en el plan gratuito.
 - [x] Ensayo del flujo completo en la URL real (rol por rol, PDF con firmas, retiro) salvo los correos automáticos, que quedan pendientes.
+- [x] Tesis: ajustes del usuario aplicados (plan gratuito por evaluación de otro servicio con dominio propio; correo previsto con Microsoft 365/Outlook al publicar con dominio propio; v1.0.0; sin el nombre «SETESA Workflow»). Revisión final de la tesis (2026-11-05): copia «Actualizado (revisión final).docx» con estados unificados, commit y 375 pruebas, incidencias de zona horaria y SMTP, respaldo/instalador y plan gratuito. Pendiente que el usuario la abra, actualice campos (índice) y la dé por buena.
 - [ ] DONDE NOS QUEDAMOS (2026-11-05, antes de la presentación): app Live en Render y funcional; no se tocó nada más antes de la demo. Pendientes en orden: correo (Brevo 2525 o Render Starter), dominio propio, botón de Avisos, lentitud, respaldo de producción, v1.0.0, revisión final de la tesis, guion/PPT/video.
-- [ ] Etiqueta `v1.0.0` tras el ensayo.
+- [x] Renombrado: el sistema ya no se llama «SETESA Workflow» (no es un workflow) sino «SETESA Ausencias» en la app (título, pie del PDF, tablero), README y documentos; «workflow» pasa a «flujo de aprobación». Se conservan los identificadores internos (`estado_workflow`, `workflow.py`) y el nombre del servicio en Render (cambiarlo cambia la URL).
+- [ ] Etiqueta `v1.0.0` se mueve al commit de esta fase tras fusionar (la anterior, sobre `b3ecde1`, quedó obsoleta) y la tesis cita ese commit.
 
 ---
 
