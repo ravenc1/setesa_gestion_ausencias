@@ -837,6 +837,7 @@ la base de datos es de pocos milisegundos.
 - [ ] DONDE NOS QUEDAMOS (2026-11-05, antes de la presentación): app Live en Render y funcional; no se tocó nada más antes de la demo. Pendientes en orden: correo (Brevo 2525 o Render Starter), dominio propio, botón de Avisos, lentitud, respaldo de producción, v1.0.0, revisión final de la tesis, guion/PPT/video.
 - [x] Renombrado: el sistema ya no se llama «SETESA Workflow» (no es un workflow) sino «SETESA Ausencias» en la app (título, pie del PDF, tablero), README y documentos; «workflow» pasa a «flujo de aprobación». Se conservan los identificadores internos (`estado_workflow`, `workflow.py`) y el nombre del servicio en Render (cambiarlo cambia la URL).
 - [x] Etiqueta `v1.0.0` movida al commit `a15c78a` (merge del PR #21, 2026-11-05); la tesis cita «versión v1.0.0, commit a15c78a».
+- [x] Verificado por el usuario en Render con v1.0.0 (2026-11-05): la app se muestra como «SETESA Ausencias», el PDF dice «Generado por SETESA Ausencias» y el flujo completo funciona.
 - [x] Tesis lista: copia «Actualizado (revisión final).docx» sin referencias antiguas (v0.25.0, 320 pruebas, estados abreviados). Solo falta que el usuario actualice los índices (Ctrl+A, F9) y la revise en Word.
 
 ---
