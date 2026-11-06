@@ -826,7 +826,7 @@ la base de datos es de pocos milisegundos.
 - [x] Ensayo del flujo (2026-11-05): registro, visto bueno, aprobación, contabilidad/RR.HH., PDF con firmas y retiro funcionan en la URL real.
 - [x] Corrección de fechas del PDF: el servidor está en UTC y tras las 18:00 marcaba el día siguiente. `TZ=America/Guatemala` (config y `render.yaml`) + migración 26 (zona horaria de la base).
 - [x] Comando de la migración 26 con `--env .env.produccion` (evita fallos por saltos de línea de Windows al leer el archivo).
-- [x] Migración 26 aplicada en producción (2026-11-05): zona horaria de la base = America/Guatemala. Pendiente comprobar con una solicitud nueva que el PDF lleve la fecha de hoy.
+- [x] Migración 26 aplicada en producción (2026-11-05): zona horaria de la base = America/Guatemala. Verificado por el usuario con un flujo nuevo: el PDF lleva la fecha actual.
 - [ ] Correos automáticos no llegan (Render gratuito bloquea los puertos SMTP 25/465/587): cambiar de proveedor/puerto.
 - [ ] Botón de recordatorio de «Avisos» (mailto) no usa el correo del usuario que lo envía.
 - [ ] Lentitud de la app en el plan gratuito.
