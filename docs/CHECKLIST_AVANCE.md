@@ -822,7 +822,8 @@ la base de datos es de pocos milisegundos.
 - [x] `scripts/respaldo.py`: respaldo completo (13 tablas en .jsonl + archivos del bucket con SHA-256 + manifiesto) y restauración transaccional (todo o nada, con `--simular`). Ensayado con rollback en pruebas y en producción.
 - [x] Cuenta de Render con plan gratuito creada por el usuario (2026-11-05).
 - [x] `docs/DESPLIEGUE.md`: sección 8b (Render, instalador, respaldo, plan gratuito).
-- [ ] Publicar en Render, configurar secretos y SMTP, ensayar el flujo completo en la URL real.
+- [x] Publicado en Render mediante Blueprint (2026-11-05): servicio en línea, ingreso de IT y cambio de contraseña obligatorio verificados en la URL real.
+- [ ] Ensayar el flujo completo en la URL real (usuarios de cada rol, solicitud de extremo a extremo, correos SMTP, PDF y firmas).
 - [ ] Etiqueta `v1.0.0` tras el ensayo.
 
 ---
