@@ -825,6 +825,7 @@ la base de datos es de pocos milisegundos.
 - [x] Publicado en Render mediante Blueprint (2026-11-05): servicio en línea, ingreso de IT y cambio de contraseña obligatorio verificados en la URL real.
 - [x] Ensayo del flujo (2026-11-05): registro, visto bueno, aprobación, contabilidad/RR.HH., PDF con firmas y retiro funcionan en la URL real.
 - [x] Corrección de fechas del PDF: el servidor está en UTC y tras las 18:00 marcaba el día siguiente. `TZ=America/Guatemala` (config y `render.yaml`) + migración 26 (zona horaria de la base).
+- [x] Comando de la migración 26 con `--env .env.produccion` (evita fallos por saltos de línea de Windows al leer el archivo).
 - [ ] Correos automáticos no llegan (Render gratuito bloquea los puertos SMTP 25/465/587): cambiar de proveedor/puerto.
 - [ ] Botón de recordatorio de «Avisos» (mailto) no usa el correo del usuario que lo envía.
 - [ ] Lentitud de la app en el plan gratuito.
