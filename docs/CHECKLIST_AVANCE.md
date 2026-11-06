@@ -832,7 +832,8 @@ la base de datos es de pocos milisegundos.
 - [ ] Correos automáticos no llegan (Render gratuito bloquea los puertos SMTP 25/465/587): cambiar de proveedor/puerto.
 - [ ] Botón de recordatorio de «Avisos» (mailto) no usa el correo del usuario que lo envía.
 - [ ] Lentitud de la app en el plan gratuito.
-- [ ] Ensayar el flujo completo en la URL real (usuarios de cada rol, solicitud de extremo a extremo, correos SMTP, PDF y firmas).
+- [x] Ensayo del flujo completo en la URL real (rol por rol, PDF con firmas, retiro) salvo los correos automáticos, que quedan pendientes.
+- [ ] DONDE NOS QUEDAMOS (2026-11-05, antes de la presentación): app Live en Render y funcional; no se tocó nada más antes de la demo. Pendientes en orden: correo (Brevo 2525 o Render Starter), dominio propio, botón de Avisos, lentitud, respaldo de producción, v1.0.0, revisión final de la tesis, guion/PPT/video.
 - [ ] Etiqueta `v1.0.0` tras el ensayo.
 
 ---
