@@ -823,6 +823,11 @@ la base de datos es de pocos milisegundos.
 - [x] Cuenta de Render con plan gratuito creada por el usuario (2026-11-05).
 - [x] `docs/DESPLIEGUE.md`: sección 8b (Render, instalador, respaldo, plan gratuito).
 - [x] Publicado en Render mediante Blueprint (2026-11-05): servicio en línea, ingreso de IT y cambio de contraseña obligatorio verificados en la URL real.
+- [x] Ensayo del flujo (2026-11-05): registro, visto bueno, aprobación, contabilidad/RR.HH., PDF con firmas y retiro funcionan en la URL real.
+- [x] Corrección de fechas del PDF: el servidor está en UTC y tras las 18:00 marcaba el día siguiente. `TZ=America/Guatemala` (config y `render.yaml`) + migración 26 (zona horaria de la base).
+- [ ] Correos automáticos no llegan (Render gratuito bloquea los puertos SMTP 25/465/587): cambiar de proveedor/puerto.
+- [ ] Botón de recordatorio de «Avisos» (mailto) no usa el correo del usuario que lo envía.
+- [ ] Lentitud de la app en el plan gratuito.
 - [ ] Ensayar el flujo completo en la URL real (usuarios de cada rol, solicitud de extremo a extremo, correos SMTP, PDF y firmas).
 - [ ] Etiqueta `v1.0.0` tras el ensayo.
 

@@ -47,6 +47,7 @@ MIGRACIONES = [
     ("migracion_fase21.py", []),
     ("migracion_fase24.py", []),
     ("migracion_fase25.py", []),
+    ("migracion_fase26.py", []),
 ]
 
 VARIABLES = ("DATABASE_URL", "FERNET_KEY", "SUPABASE_URL", "SUPABASE_SERVICE_KEY")
