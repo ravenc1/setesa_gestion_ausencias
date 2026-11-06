@@ -19,6 +19,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_KEY
         sync: false
+      - key: TZ
+        value: America/Guatemala
       - key: SUPABASE_BUCKET
         value: expedientes
       - key: SMTP_HOST

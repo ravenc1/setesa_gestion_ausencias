@@ -1,7 +1,14 @@
 # Rutas centralizadas del proyecto y acceso unificado a la configuración.
 
 import os
+import time
 from pathlib import Path
+
+# El servidor (Render) corre en UTC: sin esto, después de las 18:00 en Guatemala
+# date.today() y datetime.now() ya marcan el día siguiente (fecha del PDF).
+os.environ.setdefault("TZ", "America/Guatemala")
+if hasattr(time, "tzset"):
+    time.tzset()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 STORAGE_DIR = PROJECT_ROOT / "storage"
