@@ -826,10 +826,14 @@ la base de datos es de pocos milisegundos.
 - [x] Ensayo del flujo (2026-11-05): registro, visto bueno, aprobación, contabilidad/RR.HH., PDF con firmas y retiro funcionan en la URL real.
 - [x] Corrección de fechas del PDF: el servidor está en UTC y tras las 18:00 marcaba el día siguiente. `TZ=America/Guatemala` (config y `render.yaml`) + migración 26 (zona horaria de la base).
 - [x] Comando de la migración 26 con `--env .env.produccion` (evita fallos por saltos de línea de Windows al leer el archivo).
+- [x] Migración 26 aplicada en producción (2026-11-05): zona horaria de la base = America/Guatemala. Verificado por el usuario con un flujo nuevo: el PDF lleva la fecha actual.
+- [ ] Solución exprés para la presentación (2026-11-05): Brevo por SMTP puerto 2525 con remitente verificado, solo variables de Render (sin código). Pendiente que el usuario la configure y pruebe.
+- [ ] Después de la presentación: dominio propio (subdominio vía DNS de setesagt.com, hoy solo el dominio está en Hostinger, sin hosting ni VPS), botón de Avisos con remitente correcto, lentitud (plan Starter o consultas).
 - [ ] Correos automáticos no llegan (Render gratuito bloquea los puertos SMTP 25/465/587): cambiar de proveedor/puerto.
 - [ ] Botón de recordatorio de «Avisos» (mailto) no usa el correo del usuario que lo envía.
 - [ ] Lentitud de la app en el plan gratuito.
-- [ ] Ensayar el flujo completo en la URL real (usuarios de cada rol, solicitud de extremo a extremo, correos SMTP, PDF y firmas).
+- [x] Ensayo del flujo completo en la URL real (rol por rol, PDF con firmas, retiro) salvo los correos automáticos, que quedan pendientes.
+- [ ] DONDE NOS QUEDAMOS (2026-11-05, antes de la presentación): app Live en Render y funcional; no se tocó nada más antes de la demo. Pendientes en orden: correo (Brevo 2525 o Render Starter), dominio propio, botón de Avisos, lentitud, respaldo de producción, v1.0.0, revisión final de la tesis, guion/PPT/video.
 - [ ] Etiqueta `v1.0.0` tras el ensayo.
 
 ---
