@@ -1,4 +1,4 @@
-# Estructura del Proyecto — SETESA Workflow
+# Estructura del Proyecto — SETESA Ausencias
 
 Organización por capas (Arquitectura Web de Tres Capas, según el documento del
 proyecto). Los módulos están en sus paquetes, con `import` absolutos,
@@ -180,7 +180,7 @@ ambas en los secrets de Streamlit). La guía completa está en
    Se agregó RBAC por módulo (`rol_autorizado`).
 4. **Fase 0 (línea base)**: `docs/schema.sql`, `README.md`, `pytest.ini`,
    34 pruebas automatizadas iniciales y respaldo JSON (hoy 83).
-5. **Fase 1 (coherencia del workflow)**:
+5. **Fase 1 (coherencia del flujo)**:
    - `src/core/solicitudes.py` centraliza registro y cambios de estado.
    - `solicitud_historial` audita cada transición.
    - `CHECK` en `estado_workflow`, `NOT NULL` e índices.
@@ -239,7 +239,7 @@ ambas en los secrets de Streamlit). La guía completa está en
       SQLAlchemy (`get_engine`) para las lecturas con pandas; ya no hay
       advertencias de DBAPI2.
     - `src/core/logging_config.py` escribe un log rotativo en
-      `storage/logs/setesa.log` y registra login, workflow, PDF y vigencia.
+      `storage/logs/setesa.log` y registra login, flujo, PDF y vigencia.
     - `src/services/documentos.py` calcula el SHA-256 del PDF, lo persiste en
       `solicitud.pdf_hash` y deja un sidecar `.pdf.sha256`; el dashboard verifica
       la integridad.

@@ -1,5 +1,5 @@
 -- =============================================================================
--- SETESA Workflow - Triggers de PostgreSQL (Fase 13)
+-- SETESA Ausencias - Triggers de PostgreSQL (Fase 13)
 --
 -- Tesis, sección 3.6: los triggers validan automáticamente la vigencia de los
 -- usuarios (Fase 14: la vigencia se mide por la "actualización de datos cada

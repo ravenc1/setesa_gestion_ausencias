@@ -1,4 +1,4 @@
-# SETESA Workflow
+# SETESA Ausencias
 
 Sistema web para la digitalización de solicitudes de ausencia laboral
 («Acción de Personal») y el control de vigencia de usuarios de **SETESA**.
@@ -250,7 +250,7 @@ La aplicación abre en `http://localhost:8501`.
 
 ---
 
-## Flujo del workflow
+## Flujo de aprobación
 
 ```
 Ingresada
@@ -390,7 +390,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 # Suite automatizada (unitaria + integración + interfaz)
 .\venv\Scripts\python.exe -m pytest
 
-# Prueba E2E manual (workflow, PDF, historial; limpia sus datos)
+# Prueba E2E manual (flujo, PDF, historial; limpia sus datos)
 .\venv\Scripts\python.exe tests\smoke_test.py
 ```
 
@@ -461,7 +461,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 - **Sello SHA-256** del PDF oficial, persistido en `solicitud.pdf_hash` y en un
   archivo `.pdf.sha256`; el dashboard detecta alteraciones.
 - `.env`, `.streamlit/secrets.toml` y `storage/` fuera del control de versiones.
-- Logging rotativo en `storage/logs/setesa.log` para login, workflow, PDF y
+- Logging rotativo en `storage/logs/setesa.log` para login, flujo, PDF y
   vigencia.
 
 > La guía de producción, custodia de la clave y despliegue está en
@@ -474,7 +474,7 @@ dependencias de Streamlit, y está cubierta por pruebas unitarias.
 El avance detallado, las brechas y el plan por fases están en
 **[`docs/CHECKLIST_AVANCE.md`](docs/CHECKLIST_AVANCE.md)**.
 
-Fases completadas: **0 (línea base)**, **1 (coherencia del workflow)**,
+Fases completadas: **0 (línea base)**, **1 (coherencia del flujo)**,
 **2 (firmas completas)**, **3 (vigencia robusta: baja lógica auditable,
 ejecución semestral y reactivación)**, **4 (dashboard completo: filtros, KPIs,
 alertas, descarga del PDF final y exportación CSV)**, **5 (saldo de vacaciones,
@@ -485,7 +485,7 @@ despliegue)**, **7 (rol Contabilidad de solo lectura, HU-03)**, **8
 con auditoría)**.
 
 Cierre actual de calidad: **118 pruebas pytest** y **57/57** checks del smoke test,
-sin datos de prueba residuales en la base. El workflow de GitHub Actions compila
+sin datos de prueba residuales en la base. El flujo de trabajo de GitHub Actions compila
 y ejecuta la suite en cada push a `main`.
 
 ---
